@@ -3,44 +3,32 @@
 import { useEffect, useRef, useState } from 'react'
 
 export default function AudioController() {
-  const audioRef = useRef<HTMLAudioElement | null>(null)
+  const audioRef = useRef<HTMLAudioElement>(null)
   const [showSplash, setShowSplash] = useState(false)
   const [fading, setFading] = useState(false)
   const [playing, setPlaying] = useState(false)
   const [muted, setMuted] = useState(false)
 
   useEffect(() => {
-    const audio = new Audio('/sounds/sirius.mp3')
-    audio.loop = true
-    audio.volume = 0.3
-    audioRef.current = audio
-
     if (sessionStorage.getItem('f1_entered')) {
       // Já entrou antes — tenta autoplay, senão aguarda primeiro clique
-      audio.play()
+      audioRef.current?.play()
         .then(() => setPlaying(true))
         .catch(() => {
           const start = () => {
-            audio.play().then(() => setPlaying(true)).catch(() => {})
+            audioRef.current?.play().then(() => setPlaying(true)).catch(() => {})
           }
           document.addEventListener('click', start, { once: true })
           document.addEventListener('keydown', start, { once: true })
         })
     } else {
-      // Primeira visita — mostra splash
       setShowSplash(true)
     }
-
-    return () => { audio.pause() }
   }, [])
 
-  // Botão "ENTRAR" — audio.play() direto no clique, gesto de usuário garantido
   const handleEnter = () => {
     sessionStorage.setItem('f1_entered', '1')
-    const audio = audioRef.current
-    if (audio) {
-      audio.play().then(() => setPlaying(true)).catch(() => {})
-    }
+    audioRef.current?.play().then(() => setPlaying(true)).catch(() => {})
     setFading(true)
     setTimeout(() => setShowSplash(false), 600)
   }
@@ -54,6 +42,9 @@ export default function AudioController() {
 
   return (
     <>
+      {/* Elemento de áudio real — preload garante que o arquivo carrega antes do clique */}
+      <audio ref={audioRef} src="/sounds/sirius.mp3" loop preload="auto" />
+
       {/* Splash screen */}
       {showSplash && (
         <div style={{
