@@ -23,16 +23,18 @@ export async function GET(req: NextRequest) {
   const now = new Date()
   const log: string[] = []
 
-  // ── 1. Close predictions for races where Q1 has started ──────────────────
+  // ── 1. Close predictions for races where FP1 has started ──────────────────
   const { data: openRaces } = await supabase
     .from('races')
     .select('*')
     .eq('status', 'open')
 
   for (const race of (openRaces as Race[] ?? [])) {
-    if (new Date(race.qualifying_start_time) <= now) {
+    // Use FP1 time if available, otherwise fall back to qualifying time
+    const deadline = race.fp1_start_time ?? race.qualifying_start_time
+    if (new Date(deadline) <= now) {
       await supabase.from('races').update({ status: 'closed' }).eq('id', race.id)
-      log.push(`Closed predictions for: ${race.name}`)
+      log.push(`Closed predictions for: ${race.name} (deadline: ${deadline})`)
     }
   }
 

@@ -27,10 +27,11 @@ export async function POST() {
   const sessions: OpenF1Session[] = await res.json()
 
   // Group sessions by meeting_key
-  const meetings = new Map<number, { quali?: OpenF1Session; race?: OpenF1Session; sprint?: OpenF1Session }>()
+  const meetings = new Map<number, { fp1?: OpenF1Session; quali?: OpenF1Session; race?: OpenF1Session; sprint?: OpenF1Session }>()
 
   for (const session of sessions) {
     const group = meetings.get(session.meeting_key) ?? {}
+    if (session.session_name === 'Practice 1') group.fp1 = session
     if (session.session_type === 'Qualifying') group.quali = session
     if (session.session_type === 'Race') group.race = session
     if (session.session_type === 'Sprint') group.sprint = session
@@ -52,22 +53,25 @@ export async function POST() {
   for (const [, group] of sorted) {
     const race = group.race!
     const quali = group.quali
+    const fp1 = group.fp1
 
     if (existingKeys.has(race.session_key)) {
       roundNumber++
       continue
     }
 
-    // Qualifying time: use actual quali session or default to 3h before race
     const qualiTime = quali
       ? quali.date_start
       : new Date(new Date(race.date_start).getTime() - 3 * 60 * 60 * 1000).toISOString()
+
+    const fp1Time = fp1?.date_start ?? null
 
     toInsert.push({
       round_number: roundNumber,
       name: `Grande Prêmio ${ofCountry(race.country_name)}`,
       circuit: race.circuit_short_name,
       country: race.country_name,
+      fp1_start_time: fp1Time,
       qualifying_start_time: qualiTime,
       race_start_time: race.date_start,
       openf1_quali_session_key: quali?.session_key ?? null,

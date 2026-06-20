@@ -21,21 +21,21 @@ export interface Database {
       races: {
         Row: {
           id: string; round_number: number; name: string; circuit: string
-          country: string; qualifying_start_time: string; race_start_time: string
+          country: string; fp1_start_time: string | null; qualifying_start_time: string; race_start_time: string
           random_position: number | null; openf1_quali_session_key: number | null
           openf1_race_session_key: number | null
           status: 'upcoming' | 'open' | 'closed' | 'finished'; created_at: string
         }
         Insert: {
           round_number: number; name: string; circuit: string; country: string
-          qualifying_start_time: string; race_start_time: string
+          fp1_start_time?: string | null; qualifying_start_time: string; race_start_time: string
           random_position?: number | null; openf1_quali_session_key?: number | null
           openf1_race_session_key?: number | null; status?: 'upcoming' | 'open' | 'closed' | 'finished'
           id?: string; created_at?: string
         }
         Update: {
           round_number?: number; name?: string; circuit?: string; country?: string
-          qualifying_start_time?: string; race_start_time?: string
+          fp1_start_time?: string | null; qualifying_start_time?: string; race_start_time?: string
           random_position?: number | null; openf1_quali_session_key?: number | null
           openf1_race_session_key?: number | null; status?: 'upcoming' | 'open' | 'closed' | 'finished'
         }
