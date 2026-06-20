@@ -2,22 +2,36 @@
 
 import { useEffect, useRef, useState } from 'react'
 
+// Singleton fora do React — persiste entre re-renders
+let bgAudio: HTMLAudioElement | null = null
+
+function getAudio(): HTMLAudioElement {
+  if (!bgAudio) {
+    bgAudio = new Audio('/sounds/sirius.mp3')
+    bgAudio.loop = true
+    bgAudio.volume = 0.3
+  }
+  return bgAudio
+}
+
 export default function AudioController() {
-  const audioRef = useRef<HTMLAudioElement>(null)
   const [showSplash, setShowSplash] = useState(false)
   const [fading, setFading] = useState(false)
   const [playing, setPlaying] = useState(false)
   const [muted, setMuted] = useState(false)
 
   useEffect(() => {
+    // Pré-carrega o arquivo enquanto splash está visível
+    getAudio().load()
+
     if (sessionStorage.getItem('f1_entered')) {
-      // Já entrou antes — tenta autoplay, senão aguarda primeiro clique
-      audioRef.current?.play()
+      // Página recarregada após login — toca no primeiro clique
+      const start = () => {
+        getAudio().play().then(() => setPlaying(true)).catch(() => {})
+      }
+      getAudio().play()
         .then(() => setPlaying(true))
         .catch(() => {
-          const start = () => {
-            audioRef.current?.play().then(() => setPlaying(true)).catch(() => {})
-          }
           document.addEventListener('click', start, { once: true })
           document.addEventListener('keydown', start, { once: true })
         })
@@ -26,26 +40,33 @@ export default function AudioController() {
     }
   }, [])
 
+  // Clique direto no botão — gesto de usuário garantido ao navegador
   const handleEnter = () => {
     sessionStorage.setItem('f1_entered', '1')
-    audioRef.current?.play().then(() => setPlaying(true)).catch(() => {})
+
+    const audio = getAudio()
+    audio.play()
+      .then(() => setPlaying(true))
+      .catch(() => {
+        // Último recurso: nova instância do áudio
+        bgAudio = new Audio('/sounds/sirius.mp3')
+        bgAudio.loop = true
+        bgAudio.volume = 0.3
+        bgAudio.play().then(() => setPlaying(true)).catch(() => {})
+      })
+
     setFading(true)
     setTimeout(() => setShowSplash(false), 600)
   }
 
   const toggleMute = () => {
-    const audio = audioRef.current
-    if (!audio) return
+    const audio = getAudio()
     audio.muted = !muted
     setMuted(!muted)
   }
 
   return (
     <>
-      {/* Elemento de áudio real — preload garante que o arquivo carrega antes do clique */}
-      <audio ref={audioRef} src="/sounds/sirius.mp3" loop preload="auto" />
-
-      {/* Splash screen */}
       {showSplash && (
         <div style={{
           position: 'fixed', inset: 0, zIndex: 9999,
@@ -83,7 +104,6 @@ export default function AudioController() {
         </div>
       )}
 
-      {/* Botão mute/unmute */}
       <button onClick={toggleMute} title={muted ? 'Ativar música' : 'Silenciar música'} style={{
         position: 'fixed', bottom: '1.5rem', right: '1.5rem', zIndex: 50,
         width: '2.75rem', height: '2.75rem', borderRadius: '50%',
