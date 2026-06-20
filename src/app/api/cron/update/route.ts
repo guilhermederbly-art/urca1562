@@ -1,0 +1,172 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { createServiceClient } from '@/lib/supabase/server'
+import { getFinalPositions } from '@/lib/openf1'
+import { calculateScore } from '@/lib/scoring'
+import type { Prediction, Race } from '@/lib/types/database'
+
+// GET /api/cron/update
+// Called by Vercel Cron (or cron-job.org) every 5-10 minutes.
+// 1. Closes predictions for races where Q1 has started
+// 2. Imports results for races that should be finished
+// 3. Opens the next race as soon as a race is marked finished
+export async function GET(req: NextRequest) {
+  // Protect with a secret token (set CRON_SECRET in env)
+  const secret = process.env.CRON_SECRET
+  if (secret) {
+    const auth = req.headers.get('authorization') ?? req.nextUrl.searchParams.get('secret')
+    if (auth !== `Bearer ${secret}` && auth !== secret) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+  }
+
+  const supabase = await createServiceClient()
+  const now = new Date()
+  const log: string[] = []
+
+  // ── 1. Close predictions for races where Q1 has started ──────────────────
+  const { data: openRaces } = await supabase
+    .from('races')
+    .select('*')
+    .eq('status', 'open')
+
+  for (const race of (openRaces as Race[] ?? [])) {
+    if (new Date(race.qualifying_start_time) <= now) {
+      await supabase.from('races').update({ status: 'closed' }).eq('id', race.id)
+      log.push(`Closed predictions for: ${race.name}`)
+    }
+  }
+
+  // ── 2. Try to import results for closed races whose race time has passed ──
+  const { data: closedRaces } = await supabase
+    .from('races')
+    .select('*')
+    .eq('status', 'closed')
+
+  for (const race of (closedRaces as Race[] ?? [])) {
+    // Only attempt after race_start_time + 2 hours (gives time for race to finish)
+    const raceEndEstimate = new Date(new Date(race.race_start_time).getTime() + 2 * 60 * 60 * 1000)
+    if (now < raceEndEstimate) continue
+    if (!race.openf1_race_session_key) continue
+
+    const finished = await tryImportResults(race, supabase, log)
+
+    if (finished) {
+      // ── 3. Open the next race automatically ────────────────────────────
+      const { data: nextRace } = await supabase
+        .from('races')
+        .select('*')
+        .eq('round_number', race.round_number + 1)
+        .eq('status', 'upcoming')
+        .maybeSingle()
+
+      if (nextRace) {
+        const randomPosition = Math.floor(Math.random() * 17) + 4 // P4–P20
+        await supabase
+          .from('races')
+          .update({ status: 'open', random_position: randomPosition })
+          .eq('id', (nextRace as Race).id)
+        log.push(`Opened predictions for: ${(nextRace as Race).name} (P${randomPosition} aleatória)`)
+      }
+    }
+  }
+
+  return NextResponse.json({ ok: true, timestamp: now.toISOString(), log })
+}
+
+async function tryImportResults(
+  race: Race,
+  supabase: Awaited<ReturnType<typeof createServiceClient>>,
+  log: string[]
+): Promise<boolean> {
+  try {
+    const { data: drivers } = await supabase.from('drivers').select('*')
+    if (!drivers) return false
+
+    const byNumber = new Map(drivers.map(d => [d.number, d]))
+
+    // Fetch race positions
+    const racePositions = await getFinalPositions(race.openf1_race_session_key!)
+
+    // Need at least 10 classified finishers to consider the race done
+    if (racePositions.length < 10) {
+      log.push(`Results not ready yet for: ${race.name} (${racePositions.length} positions)`)
+      return false
+    }
+
+    const p1 = racePositions.find(p => p.position === 1)
+    const p2 = racePositions.find(p => p.position === 2)
+    const p3 = racePositions.find(p => p.position === 3)
+
+    if (!p1 || !p2 || !p3) {
+      log.push(`P1/P2/P3 not available yet for: ${race.name}`)
+      return false
+    }
+
+    const p1Id = byNumber.get(p1.driver_number)?.id ?? null
+    const p2Id = byNumber.get(p2.driver_number)?.id ?? null
+    const p3Id = byNumber.get(p3.driver_number)?.id ?? null
+
+    // Fetch qualifying for pole
+    let poleDriverId: string | null = null
+    if (race.openf1_quali_session_key) {
+      try {
+        const qualiPositions = await getFinalPositions(race.openf1_quali_session_key)
+        const pole = qualiPositions.find(p => p.position === 1)
+        if (pole) poleDriverId = byNumber.get(pole.driver_number)?.id ?? null
+      } catch {}
+    }
+
+    // Random position driver
+    let randomPosDriverId: string | null = null
+    if (race.random_position) {
+      const randomDriver = racePositions.find(p => p.position === race.random_position)
+      if (randomDriver) randomPosDriverId = byNumber.get(randomDriver.driver_number)?.id ?? null
+    }
+
+    // Bortoleto position
+    const bortoleto = drivers.find(d => d.is_bortoleto)
+    let bortoletoPosition: number | null = null
+    if (bortoleto) {
+      const bortoletoResult = racePositions.find(p => p.driver_number === bortoleto.number)
+      bortoletoPosition = bortoletoResult?.position ?? null
+    }
+
+    // Upsert result
+    await supabase.from('race_results').upsert({
+      race_id: race.id,
+      pole_driver_id: poleDriverId,
+      p1_driver_id: p1Id,
+      p2_driver_id: p2Id,
+      p3_driver_id: p3Id,
+      random_pos_driver_id: randomPosDriverId,
+      bortoleto_position: bortoletoPosition,
+      updated_at: new Date().toISOString(),
+    }, { onConflict: 'race_id' })
+
+    // Compute scores for all predictions
+    const { data: savedResult } = await supabase
+      .from('race_results').select('*').eq('race_id', race.id).single()
+
+    if (savedResult) {
+      const { data: predictions } = await supabase
+        .from('predictions').select('*').eq('race_id', race.id)
+
+      if (predictions?.length) {
+        const scoreUpserts = (predictions as Prediction[]).map(pred => ({
+          user_id: pred.user_id,
+          race_id: race.id,
+          ...calculateScore(pred, savedResult),
+        }))
+        await supabase.from('scores').upsert(scoreUpserts, { onConflict: 'user_id,race_id' })
+      }
+    }
+
+    // Mark race as finished
+    await supabase.from('races').update({ status: 'finished' }).eq('id', race.id)
+    log.push(`Results imported and scores calculated for: ${race.name}`)
+    return true
+  } catch (err) {
+    log.push(`Error importing results for ${race.name}: ${err}`)
+    return false
+  }
+}

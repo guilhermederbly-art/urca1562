@@ -1,0 +1,194 @@
+@import "tailwindcss";
+
+:root {
+  --f1-red: #e8002d;
+  --f1-red-dark: #c0001f;
+  --f1-dark: #15151e;
+  --f1-darker: #0d0d14;
+  --f1-card: #1a1a27;
+  --f1-card-hover: #20202f;
+  --f1-border: #2a2a3e;
+  --f1-border-light: #3a3a50;
+  --f1-text: #ffffff;
+  --f1-muted: #8a8aa0;
+  --f1-gold: #ffc000;
+  --f1-silver: #c0c0c0;
+  --f1-bronze: #cd7f32;
+  --f1-green: #00d2be;
+}
+
+@theme inline {
+  --color-background: var(--f1-dark);
+  --color-foreground: var(--f1-text);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  background-color: var(--f1-dark);
+  color: var(--f1-text);
+  font-family: 'Titillium Web', 'Inter', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── Cards ─────────────────────────────────────────────── */
+.card {
+  background-color: var(--f1-card);
+  border: 1px solid var(--f1-border);
+  border-radius: 2px;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Left red edge accent on cards */
+.card-accent {
+  border-left: 3px solid var(--f1-red);
+}
+
+/* ── Diagonal stripe bar (F1 signature) ─────────────────── */
+.striped-accent {
+  background: repeating-linear-gradient(
+    -60deg,
+    var(--f1-red) 0px,
+    var(--f1-red) 8px,
+    #c0001f 8px,
+    #c0001f 10px,
+    transparent 10px,
+    transparent 20px
+  );
+  height: 4px;
+  width: 100%;
+}
+
+.striped-accent-thick {
+  background: repeating-linear-gradient(
+    -60deg,
+    var(--f1-red) 0px,
+    var(--f1-red) 12px,
+    #c0001f 12px,
+    #c0001f 15px,
+    transparent 15px,
+    transparent 30px
+  );
+  height: 6px;
+  width: 100%;
+}
+
+/* ── Buttons ────────────────────────────────────────────── */
+.btn-primary {
+  background-color: var(--f1-red);
+  color: white;
+  font-weight: 700;
+  font-family: 'Titillium Web', sans-serif;
+  padding: 0.5rem 1.25rem;
+  border-radius: 2px;
+  transition: background-color 0.15s, transform 0.1s;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.8125rem;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.375rem;
+  border: none;
+  clip-path: polygon(0 0, calc(100% - 6px) 0, 100% 6px, 100% 100%, 6px 100%, 0 calc(100% - 6px));
+}
+
+.btn-primary:hover:not(:disabled) {
+  background-color: var(--f1-red-dark);
+}
+
+.btn-primary:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.btn-primary:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.btn-secondary {
+  background-color: transparent;
+  border: 1px solid var(--f1-border-light);
+  color: var(--f1-text);
+  font-weight: 600;
+  font-family: 'Titillium Web', sans-serif;
+  padding: 0.5rem 1.25rem;
+  border-radius: 2px;
+  transition: border-color 0.15s, background-color 0.15s;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-size: 0.8125rem;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.375rem;
+}
+
+.btn-secondary:hover {
+  border-color: var(--f1-red);
+  background-color: rgba(232,0,45,0.07);
+}
+
+/* ── Inputs ─────────────────────────────────────────────── */
+.input-field {
+  background-color: var(--f1-darker);
+  border: 1px solid var(--f1-border);
+  border-radius: 2px;
+  color: var(--f1-text);
+  padding: 0.625rem 0.875rem;
+  width: 100%;
+  transition: border-color 0.15s;
+  font-family: 'Titillium Web', sans-serif;
+  font-size: 0.9375rem;
+}
+
+.input-field:focus {
+  outline: none;
+  border-color: var(--f1-red);
+  background-color: #111120;
+}
+
+.input-field option {
+  background-color: #1a1a27;
+}
+
+/* ── Round number badge ─────────────────────────────────── */
+.round-badge {
+  font-size: 1.5rem;
+  font-weight: 900;
+  font-style: italic;
+  color: var(--f1-red);
+  line-height: 1;
+  min-width: 2.5rem;
+  text-align: center;
+}
+
+/* ── Section heading ────────────────────────────────────── */
+.f1-heading {
+  font-weight: 900;
+  font-style: italic;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  color: white;
+}
+
+/* ── Status pill ────────────────────────────────────────── */
+.status-pill {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  padding: 0.2rem 0.6rem;
+  border-radius: 2px;
+}
+
+/* ── Points badge ───────────────────────────────────────── */
+.pts-badge {
+  font-weight: 900;
+  font-style: italic;
+}
