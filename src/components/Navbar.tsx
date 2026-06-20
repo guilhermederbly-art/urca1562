@@ -18,6 +18,7 @@ export default function Navbar({ username }: { username: string }) {
   const links = [
     { href: '/dashboard', label: 'Corridas' },
     { href: '/leaderboard', label: 'Ranking' },
+    { href: '/participantes', label: 'Participantes' },
   ]
 
   return (
