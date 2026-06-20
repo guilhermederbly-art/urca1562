@@ -13,37 +13,27 @@ export default function MusicPlayer() {
     audio.volume = 0.3
     audioRef.current = audio
 
-    const startOnInteraction = () => {
+    const start = () => {
       audio.play().then(() => setPlaying(true)).catch(() => {})
-      document.removeEventListener('click', startOnInteraction)
-      document.removeEventListener('keydown', startOnInteraction)
     }
 
-    // Try autoplay immediately; if blocked, wait for first interaction
-    audio.play()
-      .then(() => setPlaying(true))
-      .catch(() => {
-        document.addEventListener('click', startOnInteraction)
-        document.addEventListener('keydown', startOnInteraction)
-      })
+    // Start when splash screen "Entrar" is clicked
+    document.addEventListener('f1-start-music', start, { once: true })
+
+    // Also try autoplay immediately (works if user already interacted this session)
+    audio.play().then(() => setPlaying(true)).catch(() => {})
 
     return () => {
       audio.pause()
-      document.removeEventListener('click', startOnInteraction)
-      document.removeEventListener('keydown', startOnInteraction)
+      document.removeEventListener('f1-start-music', start)
     }
   }, [])
 
   const toggle = () => {
     const audio = audioRef.current
     if (!audio) return
-    if (muted) {
-      audio.muted = false
-      setMuted(false)
-    } else {
-      audio.muted = true
-      setMuted(true)
-    }
+    audio.muted = !muted
+    setMuted(!muted)
   }
 
   return (
@@ -74,11 +64,11 @@ export default function MusicPlayer() {
         <span style={{ display: 'flex', alignItems: 'flex-end', gap: '2px', height: '16px' }}>
           {playing ? (
             <>
-              <span style={{ ...bar, animationDelay: '0s',   height: playing ? '6px'  : '4px' }} />
-              <span style={{ ...bar, animationDelay: '0.2s', height: playing ? '14px' : '4px' }} />
-              <span style={{ ...bar, animationDelay: '0.4s', height: playing ? '10px' : '4px' }} />
-              <span style={{ ...bar, animationDelay: '0.1s', height: playing ? '16px' : '4px' }} />
-              <span style={{ ...bar, animationDelay: '0.3s', height: playing ? '8px'  : '4px' }} />
+              <span style={{ ...bar, animationDelay: '0s' }} />
+              <span style={{ ...bar, animationDelay: '0.2s' }} />
+              <span style={{ ...bar, animationDelay: '0.4s' }} />
+              <span style={{ ...bar, animationDelay: '0.1s' }} />
+              <span style={{ ...bar, animationDelay: '0.3s' }} />
             </>
           ) : '♪'}
         </span>
@@ -96,6 +86,7 @@ export default function MusicPlayer() {
 const bar: React.CSSProperties = {
   display: 'inline-block',
   width: '3px',
+  height: '12px',
   backgroundColor: 'var(--f1-red)',
   borderRadius: '2px',
   animation: 'equalizer 0.8s ease-in-out infinite',
