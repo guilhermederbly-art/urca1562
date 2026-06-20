@@ -1,8 +1,7 @@
 import type { Metadata } from "next";
 import { Titillium_Web } from "next/font/google";
 import "./globals.css";
-import MusicPlayer from "@/components/MusicPlayer";
-import SplashScreen from "@/components/SplashScreen";
+import AudioController from "@/components/AudioController";
 
 const titillium = Titillium_Web({
   subsets: ["latin"],
@@ -24,8 +23,7 @@ export default function RootLayout({
     <html lang="pt-BR" className="h-full">
       <body className={`${titillium.className} min-h-full flex flex-col`}>
         {children}
-        <SplashScreen />
-        <MusicPlayer />
+        <AudioController />
       </body>
     </html>
   );
