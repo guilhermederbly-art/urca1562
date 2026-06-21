@@ -40,17 +40,7 @@ export default function SplashScreen() {
 
       <div style={{ textAlign: 'center', marginBottom: '3rem' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', justifyContent: 'center', marginBottom: '1.5rem' }}>
-          <div style={{
-            backgroundColor: 'var(--f1-red)',
-            color: 'white',
-            fontWeight: 900,
-            fontStyle: 'italic',
-            fontSize: '2.5rem',
-            padding: '0.3rem 0.9rem',
-            clipPath: 'polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 8px 100%, 0 calc(100% - 8px))',
-          }}>
-            F1
-          </div>
+          <img src="/icon.png" alt="F1" style={{ height: '72px', width: '72px', borderRadius: '14px' }} />
           <span style={{
             fontWeight: 900,
             fontStyle: 'italic',
