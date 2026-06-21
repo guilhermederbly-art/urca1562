@@ -174,7 +174,7 @@ export default function SignupPage() {
               {error && <p className="text-sm font-semibold" style={{ color: 'var(--f1-red)' }}>{error}</p>}
 
               <button type="submit" className="btn-primary w-full mt-2" disabled={loading}>
-                {loading ? 'Criando...' : '▶ Criar Conta'}
+                {loading ? 'Criando...' : 'Criar Conta'}
               </button>
             </form>
 

@@ -118,7 +118,7 @@ export default function LoginPage() {
               )}
 
               <button type="submit" className="btn-primary w-full mt-2" disabled={loading}>
-                {loading ? 'Entrando...' : '▶ Entrar'}
+                {loading ? 'Entrando...' : 'Entrar'}
               </button>
             </form>
 

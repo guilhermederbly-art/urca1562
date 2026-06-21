@@ -326,7 +326,7 @@ export default function DashboardRaces({ openRace, activeRaces, finishedRaces, p
                   className="btn-primary"
                   style={{ fontSize: '0.875rem', padding: '0.6rem 1.5rem', fontWeight: 900 }}
                 >
-                  ▶ Palpitar
+                  Palpitar
                 </Link>
               ) : (
                 <div className="text-center">

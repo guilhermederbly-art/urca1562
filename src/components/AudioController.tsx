@@ -98,7 +98,7 @@ export default function AudioController() {
           </div>
 
           <button onClick={handleEnter} className="btn-primary" style={{ fontSize: '1rem', padding: '0.9rem 3rem', letterSpacing: '0.15em' }}>
-            ▶ &nbsp;ENTRAR
+            ENTRAR
           </button>
 
           <div className="striped-accent-thick" style={{ position: 'absolute', bottom: 0, left: 0, right: 0 }} />
