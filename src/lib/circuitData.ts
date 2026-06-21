@@ -1,33 +1,131 @@
 export type CircuitInfo = {
   laps: number
-  wikiImage: string
+  wikiTitle: string
+  lapRecord: { time: string; driver: string; year: number }
+  mostWins: { driver: string; wins: number }
 }
 
 const circuits: Record<string, CircuitInfo> = {
-  albert_park:  { laps: 58, wikiImage: 'Albert_Park_Grand_Prix_Circuit.svg' },
-  shanghai:     { laps: 56, wikiImage: 'Shanghai_circuit.svg' },
-  suzuka:       { laps: 53, wikiImage: 'Suzuka_circuit_2005.svg' },
-  bahrain:      { laps: 57, wikiImage: 'Bahrain_International_Circuit_2010.svg' },
-  jeddah:       { laps: 50, wikiImage: 'Jeddah_circuit.svg' },
-  miami:        { laps: 57, wikiImage: 'Miami_International_Autodrome.svg' },
-  monaco:       { laps: 78, wikiImage: 'Circuit_de_Monaco.svg' },
-  montreal:     { laps: 70, wikiImage: 'Circuit_Gilles_Villeneuve.svg' },
-  barcelona:    { laps: 66, wikiImage: 'Circuit_de_Barcelona-Catalunya.svg' },
-  red_bull_ring:{ laps: 71, wikiImage: 'Red_Bull_Ring.svg' },
-  silverstone:  { laps: 52, wikiImage: 'Silverstone_circuit_2020.svg' },
-  spa:          { laps: 44, wikiImage: 'Spa-Francorchamps_of_Belgium.svg' },
-  hungaroring:  { laps: 70, wikiImage: 'Hungaroring.svg' },
-  zandvoort:    { laps: 72, wikiImage: 'Circuit_Zandvoort.svg' },
-  monza:        { laps: 53, wikiImage: 'Monza_track_map.svg' },
-  madrid:       { laps: 55, wikiImage: 'Madrid_Street_Circuit.svg' },
-  baku:         { laps: 51, wikiImage: 'Baku_City_Circuit.svg' },
-  singapore:    { laps: 62, wikiImage: 'Marina_Bay_Street_Circuit.svg' },
-  cota:         { laps: 56, wikiImage: 'Circuit_of_the_Americas.svg' },
-  mexico:       { laps: 71, wikiImage: 'Autodromo_Hermanos_Rodriguez.svg' },
-  interlagos:   { laps: 71, wikiImage: 'Interlagos.svg' },
-  las_vegas:    { laps: 50, wikiImage: 'Las_Vegas_Street_Circuit.svg' },
-  losail:       { laps: 57, wikiImage: 'Losail_International_Circuit.svg' },
-  yas_marina:   { laps: 55, wikiImage: 'Yas_Marina_Circuit.svg' },
+  albert_park:  {
+    laps: 58, wikiTitle: 'Albert Park Circuit',
+    lapRecord: { time: '1:20.235', driver: 'Charles Leclerc', year: 2022 },
+    mostWins: { driver: 'Michael Schumacher / Lewis Hamilton', wins: 4 },
+  },
+  shanghai:     {
+    laps: 56, wikiTitle: 'Shanghai International Circuit',
+    lapRecord: { time: '1:32.238', driver: 'Michael Schumacher', year: 2004 },
+    mostWins: { driver: 'Michael Schumacher / Lewis Hamilton / Sebastian Vettel', wins: 2 },
+  },
+  suzuka:       {
+    laps: 53, wikiTitle: 'Suzuka International Racing Course',
+    lapRecord: { time: '1:30.983', driver: 'Lewis Hamilton', year: 2019 },
+    mostWins: { driver: 'Michael Schumacher', wins: 6 },
+  },
+  bahrain:      {
+    laps: 57, wikiTitle: 'Bahrain International Circuit',
+    lapRecord: { time: '1:31.447', driver: 'Pedro de la Rosa', year: 2005 },
+    mostWins: { driver: 'Lewis Hamilton / Sebastian Vettel', wins: 5 },
+  },
+  jeddah:       {
+    laps: 50, wikiTitle: 'Jeddah Street Circuit',
+    lapRecord: { time: '1:30.734', driver: 'Lewis Hamilton', year: 2021 },
+    mostWins: { driver: 'Max Verstappen', wins: 2 },
+  },
+  miami:        {
+    laps: 57, wikiTitle: 'Miami International Autodrome',
+    lapRecord: { time: '1:29.708', driver: 'Max Verstappen', year: 2023 },
+    mostWins: { driver: 'Max Verstappen', wins: 2 },
+  },
+  monaco:       {
+    laps: 78, wikiTitle: 'Circuit de Monaco',
+    lapRecord: { time: '1:12.909', driver: 'Lando Norris', year: 2024 },
+    mostWins: { driver: 'Ayrton Senna', wins: 6 },
+  },
+  montreal:     {
+    laps: 70, wikiTitle: 'Circuit Gilles Villeneuve',
+    lapRecord: { time: '1:13.078', driver: 'Valtteri Bottas', year: 2019 },
+    mostWins: { driver: 'Michael Schumacher', wins: 7 },
+  },
+  barcelona:    {
+    laps: 66, wikiTitle: 'Circuit de Barcelona-Catalunya',
+    lapRecord: { time: '1:16.330', driver: 'Max Verstappen', year: 2023 },
+    mostWins: { driver: 'Michael Schumacher', wins: 6 },
+  },
+  red_bull_ring: {
+    laps: 71, wikiTitle: 'Red Bull Ring',
+    lapRecord: { time: '1:05.619', driver: 'Carlos Sainz', year: 2020 },
+    mostWins: { driver: 'Max Verstappen', wins: 5 },
+  },
+  silverstone:  {
+    laps: 52, wikiTitle: 'Silverstone Circuit',
+    lapRecord: { time: '1:27.097', driver: 'Max Verstappen', year: 2020 },
+    mostWins: { driver: 'Lewis Hamilton', wins: 8 },
+  },
+  spa:          {
+    laps: 44, wikiTitle: 'Circuit de Spa-Francorchamps',
+    lapRecord: { time: '1:46.286', driver: 'Valtteri Bottas', year: 2018 },
+    mostWins: { driver: 'Ayrton Senna / Michael Schumacher / Lewis Hamilton', wins: 6 },
+  },
+  hungaroring:  {
+    laps: 70, wikiTitle: 'Hungaroring',
+    lapRecord: { time: '1:16.627', driver: 'Lewis Hamilton', year: 2020 },
+    mostWins: { driver: 'Lewis Hamilton', wins: 8 },
+  },
+  zandvoort:    {
+    laps: 72, wikiTitle: 'Circuit Zandvoort',
+    lapRecord: { time: '1:11.097', driver: 'Max Verstappen', year: 2023 },
+    mostWins: { driver: 'Max Verstappen', wins: 3 },
+  },
+  monza:        {
+    laps: 53, wikiTitle: 'Autodromo Nazionale Monza',
+    lapRecord: { time: '1:21.046', driver: 'Rubens Barrichello', year: 2004 },
+    mostWins: { driver: 'Michael Schumacher', wins: 5 },
+  },
+  madrid:       {
+    laps: 55, wikiTitle: 'Madrid Street Circuit',
+    lapRecord: { time: '—', driver: '—', year: 2026 },
+    mostWins: { driver: '—', wins: 0 },
+  },
+  baku:         {
+    laps: 51, wikiTitle: 'Baku City Circuit',
+    lapRecord: { time: '1:43.009', driver: 'Charles Leclerc', year: 2019 },
+    mostWins: { driver: 'Sergio Pérez', wins: 2 },
+  },
+  singapore:    {
+    laps: 62, wikiTitle: 'Marina Bay Street Circuit',
+    lapRecord: { time: '1:35.867', driver: 'Lewis Hamilton', year: 2023 },
+    mostWins: { driver: 'Sebastian Vettel', wins: 5 },
+  },
+  cota:         {
+    laps: 56, wikiTitle: 'Circuit of the Americas',
+    lapRecord: { time: '1:36.169', driver: 'Charles Leclerc', year: 2019 },
+    mostWins: { driver: 'Lewis Hamilton', wins: 6 },
+  },
+  mexico:       {
+    laps: 71, wikiTitle: 'Autódromo Hermanos Rodríguez',
+    lapRecord: { time: '1:17.774', driver: 'Valtteri Bottas', year: 2021 },
+    mostWins: { driver: 'Max Verstappen', wins: 5 },
+  },
+  interlagos:   {
+    laps: 71, wikiTitle: 'Autódromo José Carlos Pace',
+    lapRecord: { time: '1:10.540', driver: 'Valtteri Bottas', year: 2018 },
+    mostWins: { driver: 'Michael Schumacher / Ayrton Senna', wins: 4 },
+  },
+  las_vegas:    {
+    laps: 50, wikiTitle: 'Las Vegas Street Circuit',
+    lapRecord: { time: '1:35.490', driver: 'Oscar Piastri', year: 2024 },
+    mostWins: { driver: 'Carlos Sainz', wins: 1 },
+  },
+  losail:       {
+    laps: 57, wikiTitle: 'Losail International Circuit',
+    lapRecord: { time: '1:24.319', driver: 'Max Verstappen', year: 2023 },
+    mostWins: { driver: 'Max Verstappen', wins: 2 },
+  },
+  yas_marina:   {
+    laps: 55, wikiTitle: 'Yas Marina Circuit',
+    lapRecord: { time: '1:26.103', driver: 'Max Verstappen', year: 2021 },
+    mostWins: { driver: 'Lewis Hamilton', wins: 5 },
+  },
 }
 
 const keywords: Record<string, string> = {
@@ -39,14 +137,14 @@ const keywords: Record<string, string> = {
   miami: 'miami',
   monaco: 'monaco', mônaco: 'monaco',
   montreal: 'montreal', canada: 'montreal', canadá: 'montreal', villeneuve: 'montreal',
-  barcelona: 'barcelona', spain: 'barcelona', espanha: 'barcelona', catalunha: 'barcelona',
-  spielberg: 'red_bull_ring', austria: 'red_bull_ring', áustria: 'red_bull_ring', 'red bull': 'red_bull_ring',
-  silverstone: 'silverstone', britain: 'silverstone', british: 'silverstone', grã: 'silverstone',
+  barcelona: 'barcelona', catalunha: 'barcelona',
+  spielberg: 'red_bull_ring', austria: 'red_bull_ring', áustria: 'red_bull_ring',
+  silverstone: 'silverstone', britain: 'silverstone', grã: 'silverstone',
   spa: 'spa', belgium: 'spa', bélgica: 'spa', francorchamps: 'spa',
   hungaroring: 'hungaroring', hungary: 'hungaroring', hungria: 'hungaroring', budapest: 'hungaroring',
   zandvoort: 'zandvoort', netherlands: 'zandvoort', holanda: 'zandvoort',
   monza: 'monza', italy: 'monza', itália: 'monza',
-  madrid: 'madrid', spain2: 'madrid',
+  madrid: 'madrid',
   baku: 'baku', azerbaijan: 'baku', azerbaijão: 'baku',
   singapore: 'singapore', singapura: 'singapore', marina: 'singapore',
   austin: 'cota', americas: 'cota', cota: 'cota', texas: 'cota',
@@ -63,8 +161,4 @@ export function getCircuitInfo(raceName: string, circuit?: string): CircuitInfo 
     if (search.includes(kw)) return circuits[key] ?? null
   }
   return null
-}
-
-export function getCircuitImageUrl(wikiImage: string): string {
-  return `https://commons.wikimedia.org/wiki/Special:FilePath/${encodeURIComponent(wikiImage)}?width=500`
 }

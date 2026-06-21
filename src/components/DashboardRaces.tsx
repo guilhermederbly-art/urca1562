@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import type { Race } from '@/lib/types/database'
-import { getCircuitInfo, getCircuitImageUrl } from '@/lib/circuitData'
+import { getCircuitInfo } from '@/lib/circuitData'
 
 interface Props {
   openRace: Race | null
@@ -152,7 +152,36 @@ function PredictionsModal({
 // ── Modal de detalhes do circuito ─────────────────────────────────────────────
 function CircuitDetailsModal({ race, onClose }: { race: Race; onClose: () => void }) {
   const info = getCircuitInfo(race.name, race.circuit)
-  const [imgOk, setImgOk] = useState(true)
+  const [imageUrl, setImageUrl] = useState<string | null>(null)
+  const [imgLoading, setImgLoading] = useState(true)
+
+  useEffect(() => {
+    if (!info?.wikiTitle) { setImgLoading(false); return }
+    setImgLoading(true)
+    setImageUrl(null)
+
+    fetch(
+      `https://en.wikipedia.org/w/api.php?action=parse&page=${encodeURIComponent(info.wikiTitle)}&prop=images&format=json&origin=*`
+    )
+      .then(r => r.json())
+      .then(data => {
+        const images: string[] = data.parse?.images ?? []
+        const svg = images.find(img => img.toLowerCase().endsWith('.svg'))
+        if (!svg) { setImgLoading(false); return }
+        return fetch(
+          `https://en.wikipedia.org/w/api.php?action=query&titles=File:${encodeURIComponent(svg)}&prop=imageinfo&iiprop=url&format=json&origin=*`
+        )
+      })
+      .then(r => r?.json())
+      .then(data => {
+        if (!data) return
+        const pages = Object.values(data.query.pages) as { imageinfo?: { url: string }[] }[]
+        const url = pages[0]?.imageinfo?.[0]?.url
+        if (url) setImageUrl(url)
+      })
+      .catch(() => {})
+      .finally(() => setImgLoading(false))
+  }, [info?.wikiTitle])
 
   return (
     <div
@@ -166,42 +195,64 @@ function CircuitDetailsModal({ race, onClose }: { race: Race; onClose: () => voi
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b" style={{ borderColor: 'var(--f1-border)' }}>
           <div>
-            <div className="text-xs font-bold uppercase tracking-widest mb-0.5" style={{ color: 'var(--f1-red)' }}>
-              Circuito
-            </div>
+            <div className="text-xs font-bold uppercase tracking-widest mb-0.5" style={{ color: 'var(--f1-red)' }}>Circuito</div>
             <div className="font-black text-white">{race.name}</div>
           </div>
           <button onClick={onClose} className="text-xl font-bold leading-none" style={{ color: 'var(--f1-muted)' }}>✕</button>
         </div>
 
-        {/* Imagem do traçado */}
-        <div
-          className="flex items-center justify-center p-6"
-          style={{ background: '#000', minHeight: '220px' }}
-        >
-          {info && imgOk ? (
+        {/* Traçado */}
+        <div className="flex items-center justify-center p-6" style={{ background: '#000', minHeight: '200px' }}>
+          {imgLoading && (
+            <p className="text-xs" style={{ color: 'var(--f1-muted)' }}>Carregando traçado...</p>
+          )}
+          {!imgLoading && imageUrl && (
             <img
-              src={getCircuitImageUrl(info.wikiImage)}
+              src={imageUrl}
               alt={race.name}
-              onError={() => setImgOk(false)}
               style={{
-                maxWidth: '100%',
-                maxHeight: '200px',
-                objectFit: 'contain',
+                maxWidth: '100%', maxHeight: '180px', objectFit: 'contain',
                 filter: 'brightness(0) invert(1) sepia(1) saturate(6) hue-rotate(310deg)',
               }}
             />
-          ) : (
+          )}
+          {!imgLoading && !imageUrl && (
             <p className="text-sm" style={{ color: 'var(--f1-muted)' }}>Traçado não disponível</p>
           )}
         </div>
 
-        {/* Voltas */}
         {info && (
-          <div className="flex items-center justify-center py-4 border-t" style={{ borderColor: 'var(--f1-border)' }}>
-            <div className="text-center">
-              <div className="text-xs font-bold uppercase tracking-widest mb-1" style={{ color: 'var(--f1-muted)' }}>Voltas</div>
-              <div className="font-black text-white text-3xl">{info.laps}</div>
+          <div className="p-4 flex flex-col gap-3">
+            {/* Voltas */}
+            <div className="flex items-center justify-center py-2 border-b" style={{ borderColor: 'var(--f1-border)' }}>
+              <div className="text-center">
+                <div className="text-xs font-bold uppercase tracking-widest mb-1" style={{ color: 'var(--f1-muted)' }}>Voltas</div>
+                <div className="font-black text-white text-3xl">{info.laps}</div>
+              </div>
+            </div>
+
+            {/* Volta mais rápida */}
+            <div className="rounded p-3" style={{ background: 'rgba(232,0,45,0.07)', border: '1px solid rgba(232,0,45,0.2)' }}>
+              <div className="text-xs font-bold uppercase tracking-widest mb-1" style={{ color: 'var(--f1-red)' }}>
+                Volta mais rápida da história
+              </div>
+              <div className="font-black text-white text-lg">{info.lapRecord.time}</div>
+              <div className="text-xs mt-0.5" style={{ color: 'var(--f1-muted)' }}>
+                {info.lapRecord.driver} · {info.lapRecord.year}
+              </div>
+            </div>
+
+            {/* Maior vencedor */}
+            <div className="rounded p-3" style={{ background: 'rgba(255,192,0,0.07)', border: '1px solid rgba(255,192,0,0.2)' }}>
+              <div className="text-xs font-bold uppercase tracking-widest mb-1" style={{ color: 'var(--f1-gold)' }}>
+                Maior vencedor
+              </div>
+              <div className="font-bold text-white text-sm">{info.mostWins.driver}</div>
+              {info.mostWins.wins > 0 && (
+                <div className="text-xs mt-0.5" style={{ color: 'var(--f1-muted)' }}>
+                  {info.mostWins.wins} {info.mostWins.wins === 1 ? 'vitória' : 'vitórias'}
+                </div>
+              )}
             </div>
           </div>
         )}
