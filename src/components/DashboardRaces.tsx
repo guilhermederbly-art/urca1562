@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import type { Race } from '@/lib/types/database'
-import { getCircuitInfo } from '@/lib/circuitData'
+import { getCircuitInfo, getCircuitImageUrl } from '@/lib/circuitData'
 
 interface Props {
   openRace: Race | null
@@ -152,83 +152,59 @@ function PredictionsModal({
 // ── Modal de detalhes do circuito ─────────────────────────────────────────────
 function CircuitDetailsModal({ race, onClose }: { race: Race; onClose: () => void }) {
   const info = getCircuitInfo(race.name, race.circuit)
-  const totalDist = info ? (info.length * info.laps).toFixed(3) : null
-
-  const typeLabel = { permanente: 'Permanente', urbano: 'Urbano / Street', misto: 'Semipermanente' }
+  const [imgOk, setImgOk] = useState(true)
 
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-4"
-      style={{ background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(4px)' }}
+      style={{ background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(4px)' }}
       onClick={e => { if (e.target === e.currentTarget) onClose() }}
     >
-      <div className="card w-full max-w-md overflow-hidden" style={{ borderRadius: '4px' }}>
+      <div className="card w-full max-w-sm overflow-hidden" style={{ borderRadius: '4px' }}>
         <div className="striped-accent-thick" />
 
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b flex-shrink-0" style={{ borderColor: 'var(--f1-border)' }}>
+        <div className="flex items-center justify-between px-5 py-4 border-b" style={{ borderColor: 'var(--f1-border)' }}>
           <div>
             <div className="text-xs font-bold uppercase tracking-widest mb-0.5" style={{ color: 'var(--f1-red)' }}>
-              Detalhes do Circuito
+              Circuito
             </div>
             <div className="font-black text-white">{race.name}</div>
-            {info && <div className="text-xs mt-0.5" style={{ color: 'var(--f1-muted)' }}>{info.fullName}</div>}
           </div>
           <button onClick={onClose} className="text-xl font-bold leading-none" style={{ color: 'var(--f1-muted)' }}>✕</button>
         </div>
 
-        <div className="p-5">
-          {!info ? (
-            <p className="text-sm text-center py-6" style={{ color: 'var(--f1-muted)' }}>Dados não disponíveis para este circuito.</p>
+        {/* Imagem do traçado */}
+        <div
+          className="flex items-center justify-center p-6"
+          style={{ background: '#000', minHeight: '220px' }}
+        >
+          {info && imgOk ? (
+            <img
+              src={getCircuitImageUrl(info.wikiImage)}
+              alt={race.name}
+              onError={() => setImgOk(false)}
+              style={{
+                maxWidth: '100%',
+                maxHeight: '200px',
+                objectFit: 'contain',
+                filter: 'brightness(0) invert(1) sepia(1) saturate(6) hue-rotate(310deg)',
+              }}
+            />
           ) : (
-            <div className="flex flex-col gap-4">
-
-              {/* Estatísticas do circuito */}
-              <div>
-                <div className="text-xs font-bold uppercase tracking-widest mb-3" style={{ color: 'var(--f1-red)' }}>
-                  Circuito
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  {[
-                    { label: 'Extensão', value: `${info.length} km` },
-                    { label: 'Voltas', value: `${info.laps} voltas` },
-                    { label: 'Distância total', value: `${totalDist} km` },
-                    { label: 'Tipo', value: typeLabel[info.type] },
-                    { label: 'Primeira corrida', value: String(info.firstRace) },
-                  ].map(({ label, value }) => (
-                    <div key={label} className="rounded p-3" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid var(--f1-border)' }}>
-                      <div className="text-xs uppercase tracking-widest mb-1" style={{ color: 'var(--f1-muted)' }}>{label}</div>
-                      <div className="font-bold text-white text-sm">{value}</div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Volta mais rápida */}
-              <div className="rounded p-4" style={{ background: 'rgba(232,0,45,0.07)', border: '1px solid rgba(232,0,45,0.25)' }}>
-                <div className="text-xs font-bold uppercase tracking-widest mb-2" style={{ color: 'var(--f1-red)' }}>
-                  Volta mais rápida da história
-                </div>
-                <div className="font-black text-white text-xl">{info.lapRecord.time}</div>
-                <div className="text-sm mt-1" style={{ color: 'var(--f1-muted)' }}>
-                  {info.lapRecord.driver} · {info.lapRecord.year}
-                </div>
-              </div>
-
-              {/* Maior vencedor */}
-              <div className="rounded p-4" style={{ background: 'rgba(255,192,0,0.07)', border: '1px solid rgba(255,192,0,0.25)' }}>
-                <div className="text-xs font-bold uppercase tracking-widest mb-2" style={{ color: 'var(--f1-gold)' }}>
-                  Maior vencedor
-                </div>
-                <div className="font-black text-white">{info.mostWins.driver}</div>
-                <div className="text-sm mt-1" style={{ color: 'var(--f1-muted)' }}>
-                  {info.mostWins.wins} {info.mostWins.wins === 1 ? 'vitória' : 'vitórias'}
-                </div>
-              </div>
-
-            </div>
+            <p className="text-sm" style={{ color: 'var(--f1-muted)' }}>Traçado não disponível</p>
           )}
         </div>
+
+        {/* Voltas */}
+        {info && (
+          <div className="flex items-center justify-center py-4 border-t" style={{ borderColor: 'var(--f1-border)' }}>
+            <div className="text-center">
+              <div className="text-xs font-bold uppercase tracking-widest mb-1" style={{ color: 'var(--f1-muted)' }}>Voltas</div>
+              <div className="font-black text-white text-3xl">{info.laps}</div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )
