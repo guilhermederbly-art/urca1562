@@ -4,24 +4,19 @@ export default async function LeaderboardPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
-  const { data: scores } = await supabase
-    .from('scores')
-    .select('user_id, total_points, profiles(username)')
+  const [{ data: profiles }, { data: scores }] = await Promise.all([
+    supabase.from('profiles').select('id, username'),
+    supabase.from('scores').select('user_id, total_points'),
+  ])
 
-  type ScoreRow = { user_id: string; total_points: number; profiles: { username: string } | null }
+  const scoreMap = (scores ?? []).reduce<Record<string, number>>((acc, s) => {
+    acc[s.user_id] = (acc[s.user_id] ?? 0) + s.total_points
+    return acc
+  }, {})
 
-  const aggregated = Object.values(
-    (scores as ScoreRow[] ?? []).reduce<Record<string, { username: string; total: number; userId: string }>>(
-      (acc, row) => {
-        if (!acc[row.user_id]) {
-          acc[row.user_id] = { userId: row.user_id, username: row.profiles?.username ?? '—', total: 0 }
-        }
-        acc[row.user_id].total += row.total_points
-        return acc
-      },
-      {}
-    )
-  ).sort((a, b) => b.total - a.total)
+  const aggregated = (profiles ?? [])
+    .map(p => ({ userId: p.id, username: p.username, total: scoreMap[p.id] ?? 0 }))
+    .sort((a, b) => b.total - a.total)
 
   const MEDAL_COLOR = [
     { bg: 'rgba(255,192,0,0.12)',  border: 'var(--f1-gold)',   text: 'var(--f1-gold)',   label: '01' },

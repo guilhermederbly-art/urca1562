@@ -5,11 +5,18 @@ import { useEffect, useRef, useState } from 'react'
 // Singleton fora do React — persiste entre re-renders
 let bgAudio: HTMLAudioElement | null = null
 
+const PLAYLIST = ['/sounds/f1_theme.mp3', '/sounds/sirius.mp3']
+let currentTrack = 0
+
 function getAudio(): HTMLAudioElement {
   if (!bgAudio) {
-    bgAudio = new Audio('/sounds/sirius.mp3')
-    bgAudio.loop = true
+    bgAudio = new Audio(PLAYLIST[0])
     bgAudio.volume = 0.3
+    bgAudio.addEventListener('ended', () => {
+      currentTrack = (currentTrack + 1) % PLAYLIST.length
+      bgAudio!.src = PLAYLIST[currentTrack]
+      bgAudio!.play().catch(() => {})
+    })
   }
   return bgAudio
 }
@@ -48,11 +55,9 @@ export default function AudioController() {
     audio.play()
       .then(() => setPlaying(true))
       .catch(() => {
-        // Último recurso: nova instância do áudio
-        bgAudio = new Audio('/sounds/sirius.mp3')
-        bgAudio.loop = true
-        bgAudio.volume = 0.3
-        bgAudio.play().then(() => setPlaying(true)).catch(() => {})
+        bgAudio = null
+        currentTrack = 0
+        getAudio().play().then(() => setPlaying(true)).catch(() => {})
       })
 
     setFading(true)

@@ -48,8 +48,8 @@ export default async function RacePage({ params }: { params: Promise<{ id: strin
       {isOpen && (
         <div className="mb-6 p-3 rounded border text-sm"
           style={{ borderColor: '#22c55e', backgroundColor: 'rgba(34,197,94,0.08)', color: '#22c55e' }}>
-          ✅ Palpites abertos até o início do Q1:{' '}
-          <strong>{format(new Date(race.qualifying_start_time), "dd/MM HH:mm", { locale: ptBR })}</strong>
+          ✅ Palpites abertos até o início do FP1:{' '}
+          <strong>{format(new Date(race.fp1_start_time ?? race.qualifying_start_time), "dd/MM HH:mm", { locale: ptBR })}</strong>
         </div>
       )}
 

@@ -151,7 +151,7 @@ export default function PredictionForm({ race, drivers, existing, userId }: Prop
             <div className="border-t pt-4" style={{ borderColor: 'var(--f1-border)' }}>
               <DriverSelect
                 label={`🎲 Posição aleatória — P${race.random_position}`}
-                description="3 pts se acertar"
+                description="4 pts se acertar"
                 value={randomDriver}
                 onChange={setRandomDriver}
               />
@@ -161,7 +161,7 @@ export default function PredictionForm({ race, drivers, existing, userId }: Prop
           <div className="border-t pt-4" style={{ borderColor: 'var(--f1-border)' }}>
             <label className="block text-sm font-semibold mb-1.5">
               🇧🇷 Posição do Bortoleto
-              <span className="ml-2 text-xs font-normal" style={{ color: 'var(--f1-muted)' }}>3 pts se acertar</span>
+              <span className="ml-2 text-xs font-normal" style={{ color: 'var(--f1-muted)' }}>4 pts se acertar</span>
             </label>
             <select
               className="input-field"

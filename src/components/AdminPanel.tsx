@@ -6,9 +6,17 @@ import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import type { Race, Driver } from '@/lib/types/database'
 
+interface UserRow {
+  id: string
+  username: string
+  email: string
+  created_at: string
+}
+
 interface Props {
   races: Race[]
   drivers: Driver[]
+  users: UserRow[]
 }
 
 const STATUS_LABEL: Record<string, string> = {
@@ -18,23 +26,11 @@ const STATUS_LABEL: Record<string, string> = {
   finished: 'Finalizada',
 }
 
-export default function AdminPanel({ races, drivers }: Props) {
+export default function AdminPanel({ races, drivers, users }: Props) {
   const router = useRouter()
   const [loading, setLoading] = useState<string | null>(null)
   const [message, setMessage] = useState('')
-
-  // New race form
-  const [showNewRace, setShowNewRace] = useState(false)
-  const [newRace, setNewRace] = useState({
-    round_number: '',
-    name: '',
-    circuit: '',
-    country: '',
-    qualifying_start_time: '',
-    race_start_time: '',
-    openf1_quali_session_key: '',
-    openf1_race_session_key: '',
-  })
+  const [confirmDelete, setConfirmDelete] = useState<string | null>(null)
 
   async function openPredictions(raceId: string) {
     setLoading(raceId + '-open')
@@ -76,56 +72,38 @@ export default function AdminPanel({ races, drivers }: Props) {
     router.refresh()
   }
 
-  async function runAutomation() {
-    setLoading('automation')
-    setMessage('Executando automação...')
-    const res = await fetch('/api/cron/update')
-    const data = await res.json()
-    if (res.ok) {
-      const logText = data.log?.length ? data.log.join(' · ') : 'Nada a fazer no momento.'
-      setMessage(`✅ ${logText}`)
-    } else {
-      setMessage(`❌ ${data.error}`)
-    }
-    setLoading(null)
-    router.refresh()
-  }
-
-  async function importCalendar() {
-    setLoading('import-calendar')
-    setMessage('Buscando calendário 2026 via OpenF1...')
-    const res = await fetch('/api/races/import-calendar', { method: 'POST' })
-    const data = await res.json()
-    setMessage(
-      res.ok
-        ? data.imported === 0
-          ? '✅ Calendário já estava atualizado, nenhuma corrida nova.'
-          : `✅ ${data.imported} corrida(s) importada(s) com sucesso!`
-        : `❌ ${data.error}`
-    )
-    setLoading(null)
-    router.refresh()
-  }
-
-  async function createRace(e: React.FormEvent) {
-    e.preventDefault()
-    setLoading('new-race')
-    const res = await fetch('/api/races/create', {
+  async function reopenPredictions(raceId: string) {
+    setLoading(raceId + '-reopen')
+    const res = await fetch('/api/races/reopen', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        ...newRace,
-        round_number: Number(newRace.round_number),
-        openf1_quali_session_key: newRace.openf1_quali_session_key ? Number(newRace.openf1_quali_session_key) : null,
-        openf1_race_session_key: newRace.openf1_race_session_key ? Number(newRace.openf1_race_session_key) : null,
-      }),
+      body: JSON.stringify({ raceId }),
     })
     const data = await res.json()
-    setMessage(res.ok ? '✅ Corrida criada!' : `❌ ${data.error}`)
+    setMessage(res.ok ? '✅ Palpites reabertos!' : `❌ ${data.error}`)
     setLoading(null)
-    setShowNewRace(false)
     router.refresh()
   }
+
+  async function deleteUser(userId: string) {
+    setLoading('del-' + userId)
+    const res = await fetch('/api/admin/delete-user', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId }),
+    })
+    const data = await res.json()
+    setMessage(res.ok ? '✅ Usuário excluído.' : `❌ ${data.error}`)
+    setConfirmDelete(null)
+    setLoading(null)
+    router.refresh()
+  }
+
+  const now = new Date()
+  // Oculta corridas já passadas (pela data) ou finalizadas
+  const visibleRaces = races.filter(r =>
+    r.status !== 'finished' && new Date(r.race_start_time) >= now
+  )
 
   return (
     <div className="flex flex-col gap-6">
@@ -136,82 +114,14 @@ export default function AdminPanel({ races, drivers }: Props) {
         </div>
       )}
 
-      {/* Automation */}
-      <div className="card p-4 flex items-center justify-between gap-4">
-        <div>
-          <div className="font-bold text-sm">Automação</div>
-          <div className="text-xs mt-0.5" style={{ color: 'var(--f1-muted)' }}>
-            Fecha palpites, importa resultados e abre a próxima rodada automaticamente
-          </div>
-        </div>
-        <button
-          onClick={runAutomation}
-          className="btn-primary text-xs px-4 py-2 flex-shrink-0"
-          disabled={!!loading}
-        >
-          {loading === 'automation' ? 'Executando...' : '⚡ Executar agora'}
-        </button>
-      </div>
-
       {/* Races list */}
       <div className="card overflow-hidden">
-        <div className="flex items-center justify-between px-5 py-4 border-b" style={{ borderColor: 'var(--f1-border)' }}>
+        <div className="px-5 py-4 border-b" style={{ borderColor: 'var(--f1-border)' }}>
           <h2 className="font-bold">Corridas</h2>
-          <div className="flex gap-2">
-            <button
-              onClick={importCalendar}
-              className="text-xs px-4 py-2 rounded font-bold border"
-              style={{ borderColor: '#22c55e', color: '#22c55e' }}
-              disabled={!!loading}
-            >
-              {loading === 'import-calendar' ? 'Importando...' : '🗓 Importar calendário 2026'}
-            </button>
-            <button onClick={() => setShowNewRace(!showNewRace)} className="btn-secondary text-xs px-4 py-2">
-              + Manual
-            </button>
-          </div>
         </div>
 
-        {showNewRace && (
-          <form onSubmit={createRace} className="p-5 border-b flex flex-col gap-3" style={{ borderColor: 'var(--f1-border)' }}>
-            <h3 className="font-bold text-sm">Nova Corrida</h3>
-            <div className="grid grid-cols-2 gap-3">
-              {[
-                { field: 'round_number', label: 'Rodada', type: 'number', placeholder: '1' },
-                { field: 'country', label: 'País', type: 'text', placeholder: 'Bahrain' },
-                { field: 'name', label: 'Nome', type: 'text', placeholder: 'Grande Prêmio do Bahrain' },
-                { field: 'circuit', label: 'Circuito', type: 'text', placeholder: 'Sakhir' },
-                { field: 'qualifying_start_time', label: 'Início do Q1', type: 'datetime-local', placeholder: '' },
-                { field: 'race_start_time', label: 'Largada', type: 'datetime-local', placeholder: '' },
-                { field: 'openf1_quali_session_key', label: 'OpenF1 Quali Key', type: 'number', placeholder: 'opcional' },
-                { field: 'openf1_race_session_key', label: 'OpenF1 Race Key', type: 'number', placeholder: 'opcional' },
-              ].map(({ field, label, type, placeholder }) => (
-                <div key={field}>
-                  <label className="block text-xs font-medium mb-1" style={{ color: 'var(--f1-muted)' }}>{label}</label>
-                  <input
-                    type={type}
-                    className="input-field text-sm"
-                    placeholder={placeholder}
-                    value={newRace[field as keyof typeof newRace]}
-                    onChange={e => setNewRace(p => ({ ...p, [field]: e.target.value }))}
-                    required={!['openf1_quali_session_key', 'openf1_race_session_key'].includes(field)}
-                  />
-                </div>
-              ))}
-            </div>
-            <div className="flex gap-2 mt-1">
-              <button type="submit" className="btn-primary text-xs px-4 py-2" disabled={loading === 'new-race'}>
-                {loading === 'new-race' ? 'Criando...' : 'Criar corrida'}
-              </button>
-              <button type="button" onClick={() => setShowNewRace(false)} className="btn-secondary text-xs px-4 py-2">
-                Cancelar
-              </button>
-            </div>
-          </form>
-        )}
-
         <div className="divide-y" style={{ borderColor: 'var(--f1-border)' }}>
-          {races.map(race => (
+          {visibleRaces.map(race => (
             <div key={race.id} className="px-5 py-4 flex items-start gap-4">
               <div className="flex-1">
                 <div className="font-bold">{race.round_number}. {race.name}</div>
@@ -222,15 +132,6 @@ export default function AdminPanel({ races, drivers }: Props) {
                 </div>
               </div>
               <div className="flex flex-wrap gap-2 flex-shrink-0">
-                {race.status === 'upcoming' && (
-                  <button
-                    onClick={() => openPredictions(race.id)}
-                    className="btn-primary text-xs px-3 py-1.5"
-                    disabled={!!loading}
-                  >
-                    {loading === race.id + '-open' ? '...' : 'Abrir palpites'}
-                  </button>
-                )}
                 {race.status === 'open' && (
                   <button
                     onClick={() => closePredictions(race.id)}
@@ -241,7 +142,17 @@ export default function AdminPanel({ races, drivers }: Props) {
                     {loading === race.id + '-close' ? '...' : 'Fechar palpites'}
                   </button>
                 )}
-                {(race.status === 'closed' || race.status === 'finished') && (
+                {race.status === 'closed' && (
+                  <button
+                    onClick={() => reopenPredictions(race.id)}
+                    className="text-xs px-3 py-1.5 rounded font-bold border"
+                    style={{ borderColor: '#a78bfa', color: '#a78bfa' }}
+                    disabled={!!loading}
+                  >
+                    {loading === race.id + '-reopen' ? '...' : '↩ Reabrir palpites'}
+                  </button>
+                )}
+                {race.status === 'closed' && (
                   <button
                     onClick={() => fetchResults(race.id)}
                     className="text-xs px-3 py-1.5 rounded font-bold border"
@@ -254,22 +165,62 @@ export default function AdminPanel({ races, drivers }: Props) {
               </div>
             </div>
           ))}
-          {races.length === 0 && (
-            <p className="px-5 py-6 text-sm" style={{ color: 'var(--f1-muted)' }}>Nenhuma corrida cadastrada.</p>
+          {visibleRaces.length === 0 && (
+            <p className="px-5 py-6 text-sm" style={{ color: 'var(--f1-muted)' }}>Nenhuma corrida ativa.</p>
           )}
         </div>
       </div>
 
-      {/* OpenF1 help */}
-      <div className="card p-5 text-sm" style={{ borderColor: 'var(--f1-border)' }}>
-        <h3 className="font-bold mb-2">Como obter as chaves OpenF1</h3>
-        <ol className="flex flex-col gap-1 list-decimal list-inside" style={{ color: 'var(--f1-muted)' }}>
-          <li>Acesse <code className="text-white">api.openf1.org/v1/sessions?year=2026</code></li>
-          <li>Encontre a corrida pelo <code className="text-white">meeting_name</code> e <code className="text-white">country_name</code></li>
-          <li>Copie o <code className="text-white">session_key</code> da sessão <strong className="text-white">Qualifying</strong> e da <strong className="text-white">Race</strong></li>
-          <li>Insira os valores ao criar a corrida</li>
-        </ol>
+      {/* Users */}
+      <div className="card overflow-hidden">
+        <div className="px-5 py-4 border-b" style={{ borderColor: 'var(--f1-border)' }}>
+          <h2 className="font-bold">Usuários <span className="text-xs font-normal ml-1" style={{ color: 'var(--f1-muted)' }}>({users.length})</span></h2>
+        </div>
+        <div className="divide-y" style={{ borderColor: 'var(--f1-border)' }}>
+          {users.map(u => (
+            <div key={u.id} className="px-5 py-3 flex items-center gap-4">
+              <div className="flex-1">
+                <div className="font-bold text-sm">{u.username}</div>
+                <div className="text-xs mt-0.5" style={{ color: 'var(--f1-muted)' }}>{u.email}</div>
+              </div>
+              <div className="text-xs flex-shrink-0" style={{ color: 'var(--f1-muted)' }}>
+                {format(new Date(u.created_at), 'dd/MM/yyyy', { locale: ptBR })}
+              </div>
+              {confirmDelete === u.id ? (
+                <div className="flex gap-2 flex-shrink-0">
+                  <button
+                    onClick={() => deleteUser(u.id)}
+                    className="text-xs px-3 py-1.5 rounded font-bold"
+                    style={{ background: 'var(--f1-red)', color: 'white' }}
+                    disabled={loading === 'del-' + u.id}
+                  >
+                    {loading === 'del-' + u.id ? '...' : 'Confirmar'}
+                  </button>
+                  <button
+                    onClick={() => setConfirmDelete(null)}
+                    className="btn-secondary text-xs px-3 py-1.5"
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => setConfirmDelete(u.id)}
+                  className="text-xs px-3 py-1.5 rounded font-bold border flex-shrink-0"
+                  style={{ borderColor: 'var(--f1-red)', color: 'var(--f1-red)' }}
+                  disabled={!!loading}
+                >
+                  Excluir
+                </button>
+              )}
+            </div>
+          ))}
+          {users.length === 0 && (
+            <p className="px-5 py-6 text-sm" style={{ color: 'var(--f1-muted)' }}>Nenhum usuário cadastrado.</p>
+          )}
+        </div>
       </div>
+
     </div>
   )
 }

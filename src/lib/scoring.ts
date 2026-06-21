@@ -43,18 +43,18 @@ export function calculateScore(
     return 0
   })()
 
-  // Random position: 3 pts exact match only
+  // Random position: 4 pts exact match only
   const random_pos_points =
     prediction.random_pos_driver_id &&
     prediction.random_pos_driver_id === result.random_pos_driver_id
-      ? 3
+      ? 4
       : 0
 
-  // Bortoleto position: 3 pts exact match only
+  // Bortoleto position: 4 pts exact match only
   const bortoleto_points =
     prediction.bortoleto_position !== null &&
     prediction.bortoleto_position === result.bortoleto_position
-      ? 3
+      ? 4
       : 0
 
   const total_points =

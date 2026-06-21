@@ -12,6 +12,7 @@ export default function SignupPage() {
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [emailSent, setEmailSent] = useState(false)
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -20,20 +21,85 @@ export default function SignupPage() {
       setError('A senha deve ter ao menos 6 caracteres.')
       return
     }
+    if (username.trim().length < 2) {
+      setError('Nome de piloto deve ter ao menos 2 caracteres.')
+      return
+    }
     setLoading(true)
     const supabase = createClient()
-    const { error } = await supabase.auth.signUp({
+
+    // Check if username is already taken
+    const { data: existing } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('username', username.trim())
+      .maybeSingle()
+
+    if (existing) {
+      setError('Esse nome de piloto já está em uso. Escolha outro.')
+      setLoading(false)
+      return
+    }
+
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
-      options: { data: { username } },
+      options: { data: { username: username.trim() } },
     })
     if (error) {
-      setError(error.message === 'User already registered' ? 'Email já cadastrado.' : 'Erro ao criar conta.')
+      if (error.message === 'User already registered') {
+        setError('Email já cadastrado.')
+      } else if (error.message.includes('already')) {
+        setError('Nome de piloto já em uso. Escolha outro.')
+      } else {
+        setError(`Erro ao criar conta: ${error.message}`)
+      }
       setLoading(false)
-    } else {
-      router.push('/dashboard')
-      router.refresh()
+      return
     }
+
+    // If session is null, email confirmation is required
+    if (!data.session) {
+      setEmailSent(true)
+      setLoading(false)
+      return
+    }
+
+    router.push('/dashboard')
+    router.refresh()
+  }
+
+  if (emailSent) {
+    return (
+      <div
+        className="min-h-screen flex items-center justify-center px-4"
+        style={{ background: 'radial-gradient(ellipse at top, #1e0a0a 0%, #15151e 50%, #0d0d14 100%)' }}
+      >
+        <div className="w-full max-w-sm text-center">
+          <div className="card" style={{ borderRadius: '2px' }}>
+            <div className="striped-accent-thick" />
+            <div className="p-8">
+              <div className="text-5xl mb-4">📧</div>
+              <h2 className="f1-heading text-xl mb-3" style={{ color: 'var(--f1-red)' }}>
+                Verifique seu email!
+              </h2>
+              <p className="text-sm mb-2" style={{ color: 'var(--f1-muted)' }}>
+                Enviamos um link de confirmação para:
+              </p>
+              <p className="font-bold text-white mb-5">{email}</p>
+              <p className="text-sm" style={{ color: 'var(--f1-muted)' }}>
+                Clique no link do email para ativar sua conta e entrar no bolão.
+              </p>
+              <div className="mt-6">
+                <Link href="/login" className="btn-primary w-full block text-center">
+                  Ir para Login
+                </Link>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   return (

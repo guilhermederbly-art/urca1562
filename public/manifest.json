@@ -1,0 +1,23 @@
+{
+  "name": "F1 Bolão 2026",
+  "short_name": "F1 Bolão",
+  "description": "Faça seus palpites de Fórmula 1 com seus amigos",
+  "start_url": "/dashboard",
+  "display": "standalone",
+  "background_color": "#15151e",
+  "theme_color": "#e8002d",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/icon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/apple-touch-icon.png",
+      "sizes": "180x180",
+      "type": "image/png"
+    }
+  ]
+}
