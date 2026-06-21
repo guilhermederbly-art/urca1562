@@ -33,21 +33,7 @@ export default function Navbar({ username, isAdmin }: { username: string; isAdmi
         <div className="container mx-auto max-w-4xl flex items-center h-12 px-4 gap-4">
           {/* Logo */}
           <Link href="/dashboard" className="flex items-center gap-2.5 flex-shrink-0" onClick={() => setMenuOpen(false)}>
-            <div
-              className="flex items-center justify-center h-7 px-2"
-              style={{
-                backgroundColor: 'var(--f1-red)',
-                clipPath: 'polygon(0 0, calc(100% - 5px) 0, 100% 5px, 100% 100%, 5px 100%, 0 calc(100% - 5px))',
-              }}
-            >
-              <span className="font-black text-white text-sm tracking-wider" style={{ fontStyle: 'italic' }}>F1</span>
-            </div>
-            <span
-              className="font-black text-white tracking-wider hidden sm:block"
-              style={{ fontSize: '1.1rem', fontStyle: 'italic', letterSpacing: '0.12em', textTransform: 'uppercase' }}
-            >
-              Bolão
-            </span>
+            <img src="/icon.svg" alt="F1 Bolão" style={{ height: '36px', width: '36px', borderRadius: '6px' }} />
           </Link>
 
           {/* Desktop nav links */}
