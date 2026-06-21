@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import { F1_LOGO_SRC } from '@/lib/f1logo'
 
 // Singleton fora do React — persiste entre re-renders
 let bgAudio: HTMLAudioElement | null = null
@@ -86,7 +87,7 @@ export default function AudioController() {
 
           <div style={{ textAlign: 'center', marginBottom: '3rem' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', justifyContent: 'center', marginBottom: '1.5rem' }}>
-              <img src="/f1-logo.png" alt="F1" style={{ height: '72px', width: '72px', borderRadius: '14px' }} />
+              <img src={F1_LOGO_SRC} alt="F1" style={{ height: '72px', width: '72px', borderRadius: '14px' }} />
               <span style={{ fontWeight: 900, fontStyle: 'italic', fontSize: '2.5rem', letterSpacing: '0.2em', color: 'white', textTransform: 'uppercase' }}>
                 BOLÃO
               </span>
