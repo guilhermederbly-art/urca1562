@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import type { Race } from '@/lib/types/database'
+import { getCircuitInfo } from '@/lib/circuitData'
 
 interface Props {
   openRace: Race | null
@@ -148,6 +149,91 @@ function PredictionsModal({
   )
 }
 
+// ── Modal de detalhes do circuito ─────────────────────────────────────────────
+function CircuitDetailsModal({ race, onClose }: { race: Race; onClose: () => void }) {
+  const info = getCircuitInfo(race.name, race.circuit)
+  const totalDist = info ? (info.length * info.laps).toFixed(3) : null
+
+  const typeLabel = { permanente: 'Permanente', urbano: 'Urbano / Street', misto: 'Semipermanente' }
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{ background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(4px)' }}
+      onClick={e => { if (e.target === e.currentTarget) onClose() }}
+    >
+      <div className="card w-full max-w-md overflow-hidden" style={{ borderRadius: '4px' }}>
+        <div className="striped-accent-thick" />
+
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-4 border-b flex-shrink-0" style={{ borderColor: 'var(--f1-border)' }}>
+          <div>
+            <div className="text-xs font-bold uppercase tracking-widest mb-0.5" style={{ color: 'var(--f1-red)' }}>
+              Detalhes do Circuito
+            </div>
+            <div className="font-black text-white">{race.name}</div>
+            {info && <div className="text-xs mt-0.5" style={{ color: 'var(--f1-muted)' }}>{info.fullName}</div>}
+          </div>
+          <button onClick={onClose} className="text-xl font-bold leading-none" style={{ color: 'var(--f1-muted)' }}>✕</button>
+        </div>
+
+        <div className="p-5">
+          {!info ? (
+            <p className="text-sm text-center py-6" style={{ color: 'var(--f1-muted)' }}>Dados não disponíveis para este circuito.</p>
+          ) : (
+            <div className="flex flex-col gap-4">
+
+              {/* Estatísticas do circuito */}
+              <div>
+                <div className="text-xs font-bold uppercase tracking-widest mb-3" style={{ color: 'var(--f1-red)' }}>
+                  Circuito
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  {[
+                    { label: 'Extensão', value: `${info.length} km` },
+                    { label: 'Voltas', value: `${info.laps} voltas` },
+                    { label: 'Distância total', value: `${totalDist} km` },
+                    { label: 'Tipo', value: typeLabel[info.type] },
+                    { label: 'Primeira corrida', value: String(info.firstRace) },
+                  ].map(({ label, value }) => (
+                    <div key={label} className="rounded p-3" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid var(--f1-border)' }}>
+                      <div className="text-xs uppercase tracking-widest mb-1" style={{ color: 'var(--f1-muted)' }}>{label}</div>
+                      <div className="font-bold text-white text-sm">{value}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Volta mais rápida */}
+              <div className="rounded p-4" style={{ background: 'rgba(232,0,45,0.07)', border: '1px solid rgba(232,0,45,0.25)' }}>
+                <div className="text-xs font-bold uppercase tracking-widest mb-2" style={{ color: 'var(--f1-red)' }}>
+                  Volta mais rápida da história
+                </div>
+                <div className="font-black text-white text-xl">{info.lapRecord.time}</div>
+                <div className="text-sm mt-1" style={{ color: 'var(--f1-muted)' }}>
+                  {info.lapRecord.driver} · {info.lapRecord.year}
+                </div>
+              </div>
+
+              {/* Maior vencedor */}
+              <div className="rounded p-4" style={{ background: 'rgba(255,192,0,0.07)', border: '1px solid rgba(255,192,0,0.25)' }}>
+                <div className="text-xs font-bold uppercase tracking-widest mb-2" style={{ color: 'var(--f1-gold)' }}>
+                  Maior vencedor
+                </div>
+                <div className="font-black text-white">{info.mostWins.driver}</div>
+                <div className="text-sm mt-1" style={{ color: 'var(--f1-muted)' }}>
+                  {info.mostWins.wins} {info.mostWins.wins === 1 ? 'vitória' : 'vitórias'}
+                </div>
+              </div>
+
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── Linha de corrida ──────────────────────────────────────────────────────────
 function RaceRow({
   race,
@@ -155,12 +241,14 @@ function RaceRow({
   isPast,
   isAdmin,
   onViewPredictions,
+  onViewDetails,
 }: {
   race: Race
   predicted: boolean
   isPast?: boolean
   isAdmin?: boolean
   onViewPredictions: (race: Race) => void
+  onViewDetails: (race: Race) => void
 }) {
   const isOpen = race.status === 'open'
   const isClosed = race.status === 'closed' || race.status === 'finished' || isPast
@@ -211,6 +299,15 @@ function RaceRow({
       </div>
 
       <div className="flex items-center gap-2 flex-shrink-0 pr-3 py-3">
+        {/* Botão detalhes */}
+        <button
+          onClick={() => onViewDetails(race)}
+          className="text-xs font-bold px-3 py-1.5 rounded border"
+          style={{ borderColor: 'var(--f1-border)', color: 'var(--f1-muted)' }}
+        >
+          Detalhes
+        </button>
+
         {/* Botão ao vivo — apenas corrida fechada com sessão OpenF1 */}
         {race.status === 'closed' && race.openf1_race_session_key && (
           <Link
@@ -265,6 +362,7 @@ function RaceRow({
 export default function DashboardRaces({ openRace, activeRaces, finishedRaces, predictedRaceIds, isAdmin }: Props) {
   const [showPast, setShowPast] = useState(false)
   const [modalRace, setModalRace] = useState<Race | null>(null)
+  const [detailsRace, setDetailsRace] = useState<Race | null>(null)
   const predicted = (id: string) => predictedRaceIds.has(id)
 
   return (
@@ -272,6 +370,9 @@ export default function DashboardRaces({ openRace, activeRaces, finishedRaces, p
 
       {modalRace && (
         <PredictionsModal race={modalRace} onClose={() => setModalRace(null)} />
+      )}
+      {detailsRace && (
+        <CircuitDetailsModal race={detailsRace} onClose={() => setDetailsRace(null)} />
       )}
 
       {/* ── Corrida em destaque (aberta) ────────────────────── */}
@@ -349,6 +450,13 @@ export default function DashboardRaces({ openRace, activeRaces, finishedRaces, p
               >
                 🎮 Simulação
               </Link>
+              <button
+                onClick={() => setDetailsRace(openRace)}
+                className="text-xs font-bold px-3 py-1.5 rounded border"
+                style={{ borderColor: 'var(--f1-border)', color: 'var(--f1-muted)' }}
+              >
+                Detalhes
+              </button>
             </div>
           </div>
         </div>
@@ -358,7 +466,7 @@ export default function DashboardRaces({ openRace, activeRaces, finishedRaces, p
       {activeRaces.length > 0 && (
         <div className="flex flex-col gap-2">
           {activeRaces.map(race => (
-            <RaceRow key={race.id} race={race} predicted={predicted(race.id)} isAdmin={isAdmin} onViewPredictions={setModalRace} />
+            <RaceRow key={race.id} race={race} predicted={predicted(race.id)} isAdmin={isAdmin} onViewPredictions={setModalRace} onViewDetails={setDetailsRace} />
           ))}
         </div>
       )}
@@ -378,7 +486,7 @@ export default function DashboardRaces({ openRace, activeRaces, finishedRaces, p
           {showPast && (
             <div className="flex flex-col gap-2 mt-2">
               {finishedRaces.map(race => (
-                <RaceRow key={race.id} race={race} predicted={predicted(race.id)} isPast isAdmin={isAdmin} onViewPredictions={setModalRace} />
+                <RaceRow key={race.id} race={race} predicted={predicted(race.id)} isPast isAdmin={isAdmin} onViewPredictions={setModalRace} onViewDetails={setDetailsRace} />
               ))}
             </div>
           )}
