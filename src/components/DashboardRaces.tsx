@@ -149,35 +149,63 @@ function PredictionsModal({
   )
 }
 
+function processCircuitSvg(raw: string): string {
+  let s = raw
+  // make responsive
+  s = s.replace(/(<svg[^>]*)\s+width="[^"]*"/, '$1')
+  s = s.replace(/(<svg[^>]*)\s+height="[^"]*"/, '$1')
+  // inject style block that overrides everything
+  s = s.replace(/<svg/, '<svg style="overflow:visible"')
+  // remove existing <style> and <defs> colour rules, <text>, <image>
+  s = s.replace(/<style[\s\S]*?<\/style>/gi, '')
+  s = s.replace(/<text[\s\S]*?<\/text>/gi, '')
+  s = s.replace(/<image[\s\S]*?\/>/gi, '')
+  s = s.replace(/<image[\s\S]*?<\/image>/gi, '')
+  // remove background rects (white / light fills)
+  s = s.replace(/<rect[^>]*fill=["'](?:#[fF]{3,6}|white|none)[^>]*\/>/g, '')
+  // strip all inline fill/stroke/style from shape elements, force red stroke
+  s = s.replace(/\bfill=["'][^"']*["']/g, 'fill="none"')
+  s = s.replace(/\bstroke=["'][^"']*["']/g, 'stroke="#e8002d"')
+  s = s.replace(/\bstroke-width=["'][^"']*["']/g, 'stroke-width="10"')
+  s = s.replace(/\bstyle=["'][^"']*["']/g, '')
+  s = s.replace(/\bclass=["'][^"']*["']/g, '')
+  // inject global override style
+  s = s.replace('</svg>', `<style>path,polyline,polygon,circle,ellipse,line,rect{fill:none;stroke:#e8002d;stroke-width:10;stroke-linejoin:round;stroke-linecap:round}text{display:none}</style></svg>`)
+  return s
+}
+
 // ── Modal de detalhes do circuito ─────────────────────────────────────────────
 function CircuitDetailsModal({ race, onClose }: { race: Race; onClose: () => void }) {
   const info = getCircuitInfo(race.name, race.circuit)
-  const [imageUrl, setImageUrl] = useState<string | null>(null)
+  const [svgHtml, setSvgHtml] = useState<string | null>(null)
   const [imgLoading, setImgLoading] = useState(true)
 
   useEffect(() => {
     if (!info?.wikiTitle) { setImgLoading(false); return }
     setImgLoading(true)
-    setImageUrl(null)
+    setSvgHtml(null)
 
-    fetch(
-      `https://en.wikipedia.org/w/api.php?action=parse&page=${encodeURIComponent(info.wikiTitle)}&prop=images&format=json&origin=*`
-    )
+    fetch(`https://en.wikipedia.org/w/api.php?action=parse&page=${encodeURIComponent(info.wikiTitle)}&prop=images&format=json&origin=*`)
       .then(r => r.json())
       .then(data => {
         const images: string[] = data.parse?.images ?? []
         const svg = images.find(img => img.toLowerCase().endsWith('.svg'))
-        if (!svg) { setImgLoading(false); return }
-        return fetch(
-          `https://en.wikipedia.org/w/api.php?action=query&titles=File:${encodeURIComponent(svg)}&prop=imageinfo&iiprop=url&format=json&origin=*`
-        )
+        if (!svg) { setImgLoading(false); return null }
+        return fetch(`https://en.wikipedia.org/w/api.php?action=query&titles=File:${encodeURIComponent(svg)}&prop=imageinfo&iiprop=url&format=json&origin=*`)
       })
       .then(r => r?.json())
       .then(data => {
-        if (!data) return
+        if (!data) return null
         const pages = Object.values(data.query.pages) as { imageinfo?: { url: string }[] }[]
-        const url = pages[0]?.imageinfo?.[0]?.url
-        if (url) setImageUrl(url)
+        return pages[0]?.imageinfo?.[0]?.url ?? null
+      })
+      .then(url => {
+        if (!url) { setImgLoading(false); return }
+        return fetch(url).then(r => r.text())
+      })
+      .then(svgText => {
+        if (!svgText) return
+        setSvgHtml(processCircuitSvg(svgText))
       })
       .catch(() => {})
       .finally(() => setImgLoading(false))
@@ -206,17 +234,13 @@ function CircuitDetailsModal({ race, onClose }: { race: Race; onClose: () => voi
           {imgLoading && (
             <p className="text-xs" style={{ color: 'var(--f1-muted)' }}>Carregando traçado...</p>
           )}
-          {!imgLoading && imageUrl && (
-            <img
-              src={imageUrl}
-              alt={race.name}
-              style={{
-                maxWidth: '100%', maxHeight: '180px', objectFit: 'contain',
-                filter: 'brightness(0) invert(1) sepia(1) saturate(6) hue-rotate(310deg)',
-              }}
+          {!imgLoading && svgHtml && (
+            <div
+              style={{ width: '100%', maxHeight: '200px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+              dangerouslySetInnerHTML={{ __html: svgHtml }}
             />
           )}
-          {!imgLoading && !imageUrl && (
+          {!imgLoading && !svgHtml && (
             <p className="text-sm" style={{ color: 'var(--f1-muted)' }}>Traçado não disponível</p>
           )}
         </div>
