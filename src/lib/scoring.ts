@@ -7,12 +7,14 @@ export interface ScoreBreakdown {
   p3_points: number
   random_pos_points: number
   bortoleto_points: number
+  challenge_points: number
   total_points: number
 }
 
 export function calculateScore(
   prediction: Prediction,
-  result: RaceResult
+  result: RaceResult,
+  challengeCorrect?: string | null
 ): ScoreBreakdown {
   const podium = new Set([result.p1_driver_id, result.p2_driver_id, result.p3_driver_id].filter(Boolean))
 
@@ -57,8 +59,15 @@ export function calculateScore(
       ? 4
       : 0
 
-  const total_points =
-    pole_points + p1_points + p2_points + p3_points + random_pos_points + bortoleto_points
+  const challenge_points =
+    challengeCorrect &&
+    prediction.challenge_answer &&
+    prediction.challenge_answer === challengeCorrect
+      ? 1
+      : 0
 
-  return { pole_points, p1_points, p2_points, p3_points, random_pos_points, bortoleto_points, total_points }
+  const total_points =
+    pole_points + p1_points + p2_points + p3_points + random_pos_points + bortoleto_points + challenge_points
+
+  return { pole_points, p1_points, p2_points, p3_points, random_pos_points, bortoleto_points, challenge_points, total_points }
 }

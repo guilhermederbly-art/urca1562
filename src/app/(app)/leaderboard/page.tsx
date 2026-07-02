@@ -1,12 +1,16 @@
 import { createClient } from '@/lib/supabase/server'
+import LeaderboardClient from '@/components/LeaderboardClient'
+
+export const metadata = { title: 'Ranking — F1 Bolão' }
 
 export default async function LeaderboardPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
-  const [{ data: profiles }, { data: scores }] = await Promise.all([
+  const [{ data: profiles }, { data: scores }, { data: races }] = await Promise.all([
     supabase.from('profiles').select('id, username'),
-    supabase.from('scores').select('user_id, total_points'),
+    supabase.from('scores').select('user_id, race_id, total_points'),
+    supabase.from('races').select('id, round_number').eq('status', 'finished').order('round_number', { ascending: false }),
   ])
 
   const scoreMap = (scores ?? []).reduce<Record<string, number>>((acc, s) => {
@@ -18,89 +22,67 @@ export default async function LeaderboardPage() {
     .map(p => ({ userId: p.id, username: p.username, total: scoreMap[p.id] ?? 0 }))
     .sort((a, b) => b.total - a.total)
 
-  const MEDAL_COLOR = [
-    { bg: 'rgba(255,192,0,0.12)',  border: 'var(--f1-gold)',   text: 'var(--f1-gold)',   label: '01' },
-    { bg: 'rgba(192,192,192,0.1)', border: 'var(--f1-silver)', text: 'var(--f1-silver)', label: '02' },
-    { bg: 'rgba(205,127,50,0.1)',  border: 'var(--f1-bronze)', text: 'var(--f1-bronze)', label: '03' },
-  ]
+  const lastRace = (races ?? [])[0]
+  const positionChange: Record<string, number> = {}
+
+  if (lastRace && (races ?? []).length > 1) {
+    const lastRaceScores = (scores ?? []).filter(s => s.race_id === lastRace.id)
+    const lastRaceMap = lastRaceScores.reduce<Record<string, number>>((acc, s) => {
+      acc[s.user_id] = s.total_points
+      return acc
+    }, {})
+    const prevAggregated = (profiles ?? [])
+      .map(p => ({ userId: p.id, total: (scoreMap[p.id] ?? 0) - (lastRaceMap[p.id] ?? 0) }))
+      .sort((a, b) => b.total - a.total)
+    const prevPositionMap: Record<string, number> = {}
+    prevAggregated.forEach((e, i) => { prevPositionMap[e.userId] = i })
+    aggregated.forEach((e, i) => {
+      const prev = prevPositionMap[e.userId] ?? i
+      positionChange[e.userId] = prev - i
+    })
+  }
+
+  const entries = aggregated.map(e => ({
+    ...e,
+    delta: positionChange[e.userId],
+  }))
+
+  const totalPts = entries.reduce((s, e) => s + e.total, 0)
+  const avgPts = entries.length > 0 ? Math.round(totalPts / entries.length) : 0
+  const leader = entries[0] ?? null
+  const finishedCount = (races ?? []).length
 
   return (
     <div>
-      <div className="mb-8">
+      <div className="mb-6">
         <p className="text-xs font-bold uppercase tracking-widest mb-1" style={{ color: 'var(--f1-red)' }}>
           Temporada 2026
         </p>
         <h1 className="f1-heading text-3xl">Ranking</h1>
       </div>
 
-      <div className="card overflow-hidden">
-        <div className="striped-accent-thick" />
-
-        {aggregated.length === 0 ? (
-          <p className="p-12 text-center text-sm uppercase tracking-widest" style={{ color: 'var(--f1-muted)' }}>
-            Nenhum palpite pontuado ainda
-          </p>
-        ) : (
-          <div>
-            {/* Header row */}
-            <div
-              className="grid px-4 py-2 text-xs font-bold uppercase tracking-widest"
-              style={{ color: 'var(--f1-muted)', borderBottom: '1px solid var(--f1-border)', gridTemplateColumns: '3rem 1fr 5rem' }}
-            >
-              <span>POS</span>
-              <span>Piloto</span>
-              <span className="text-right">PTS</span>
-            </div>
-
-            {aggregated.map((entry, i) => {
-              const isMe = entry.userId === user!.id
-              const medal = MEDAL_COLOR[i]
-
-              return (
-                <div
-                  key={entry.userId}
-                  className="grid px-4 py-3.5 items-center transition-colors"
-                  style={{
-                    gridTemplateColumns: '3rem 1fr 5rem',
-                    borderBottom: '1px solid var(--f1-border)',
-                    backgroundColor: isMe ? 'rgba(232,0,45,0.06)' : i === 0 ? 'rgba(255,192,0,0.04)' : undefined,
-                    borderLeft: isMe ? '3px solid var(--f1-red)' : medal ? `3px solid ${medal.border}` : '3px solid transparent',
-                  }}
-                >
-                  {/* Position */}
-                  <span
-                    className="font-black text-sm"
-                    style={{ fontStyle: 'italic', color: medal ? medal.text : 'var(--f1-muted)' }}
-                  >
-                    {medal ? medal.label : `0${i + 1}`.slice(-2)}
-                  </span>
-
-                  {/* Name */}
-                  <span className="font-bold text-sm truncate" style={{ color: isMe ? 'white' : 'var(--f1-text)' }}>
-                    {entry.username}
-                    {isMe && (
-                      <span
-                        className="ml-2 text-xs font-bold uppercase tracking-widest"
-                        style={{ color: 'var(--f1-red)' }}
-                      >
-                        você
-                      </span>
-                    )}
-                  </span>
-
-                  {/* Points */}
-                  <span
-                    className="text-right font-black text-lg pts-badge"
-                    style={{ color: medal ? medal.text : isMe ? 'var(--f1-red)' : 'var(--f1-text)' }}
-                  >
-                    {entry.total}
-                  </span>
-                </div>
-              )
-            })}
+      {/* Group stats */}
+      {finishedCount > 0 && (
+        <div className="grid grid-cols-3 gap-3 mb-6">
+          <div className="card p-3 text-center">
+            <div className="text-xs font-bold uppercase tracking-widest mb-1" style={{ color: 'var(--f1-muted)', fontSize: '0.6rem' }}>Corridas</div>
+            <div className="text-2xl font-black text-white">{finishedCount}</div>
+            <div className="text-xs" style={{ color: 'var(--f1-muted)' }}>finalizadas</div>
           </div>
-        )}
-      </div>
+          <div className="card p-3 text-center">
+            <div className="text-xs font-bold uppercase tracking-widest mb-1" style={{ color: 'var(--f1-muted)', fontSize: '0.6rem' }}>Média do grupo</div>
+            <div className="text-2xl font-black text-white">{avgPts}</div>
+            <div className="text-xs" style={{ color: 'var(--f1-muted)' }}>pts / participante</div>
+          </div>
+          <div className="card p-3 text-center">
+            <div className="text-xs font-bold uppercase tracking-widest mb-1" style={{ color: 'var(--f1-gold)', fontSize: '0.6rem' }}>Líder</div>
+            <div className="text-sm font-black truncate" style={{ color: 'var(--f1-gold)' }}>{leader?.username ?? '—'}</div>
+            <div className="text-xs" style={{ color: 'var(--f1-muted)' }}>{leader?.total ?? 0} pts</div>
+          </div>
+        </div>
+      )}
+
+      <LeaderboardClient entries={entries} currentUserId={user!.id} />
     </div>
   )
 }

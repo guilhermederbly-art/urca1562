@@ -3,6 +3,69 @@ import { createClient } from '@/lib/supabase/server'
 import { getFinalPositions } from '@/lib/openf1'
 import { calculateScore } from '@/lib/scoring'
 
+const ESPN_URL = 'https://site.api.espn.com/apis/site/v2/sports/racing/f1/scoreboard'
+
+interface EspnCompetitor {
+  order: number
+  winner: boolean
+  athlete: { displayName: string; fullName: string }
+}
+interface EspnCompetition {
+  date: string
+  type: { abbreviation: string }
+  status: { type: { state: string; completed: boolean } }
+  competitors: EspnCompetitor[]
+}
+interface EspnEvent {
+  name: string
+  endDate: string
+  competitions: EspnCompetition[]
+}
+
+async function getEspnPositions(raceStartTime: string): Promise<{
+  racePositions: { driverName: string; position: number }[]
+  poleDriverName: string | null
+  hasData: boolean
+}> {
+  const res = await fetch(ESPN_URL, { next: { revalidate: 0 } })
+  if (!res.ok) return { racePositions: [], poleDriverName: null, hasData: false }
+
+  const data = await res.json() as { events: EspnEvent[] }
+  const raceDate = new Date(raceStartTime)
+
+  // Find the event whose race competition date matches our race_start_time (within 6h)
+  let raceComp: EspnCompetition | null = null
+  let qualiComp: EspnCompetition | null = null
+
+  for (const event of (data.events ?? [])) {
+    for (const comp of (event.competitions ?? [])) {
+      const diff = Math.abs(new Date(comp.date).getTime() - raceDate.getTime())
+      if (comp.type.abbreviation === 'Race' && diff < 6 * 60 * 60 * 1000) {
+        raceComp = comp
+      }
+      if ((comp.type.abbreviation === 'Qual' || comp.type.abbreviation === 'Q') && diff < 3 * 24 * 60 * 60 * 1000) {
+        qualiComp = comp
+      }
+    }
+    if (raceComp) break
+  }
+
+  if (!raceComp || !raceComp.competitors?.length) {
+    return { racePositions: [], poleDriverName: null, hasData: false }
+  }
+
+  const racePositions = raceComp.competitors
+    .map(c => ({ driverName: c.athlete.displayName, position: c.order }))
+    .sort((a, b) => a.position - b.position)
+
+  const poleDriverName = qualiComp?.competitors?.find(c => c.order === 1)?.athlete.displayName ?? null
+
+  const inProgress = raceComp.status?.type?.state === 'in' || !raceComp.status?.type?.completed
+  const hasData = racePositions.length > 0 && inProgress
+
+  return { racePositions, poleDriverName, hasData }
+}
+
 // GET /api/races/live?raceId=xxx&demo=true
 export async function GET(req: NextRequest) {
   const raceId = req.nextUrl.searchParams.get('raceId')
@@ -15,86 +78,101 @@ export async function GET(req: NextRequest) {
     supabase.from('races').select('*').eq('id', raceId).single(),
     supabase.from('drivers').select('*'),
     supabase.from('predictions')
-      .select('id, user_id, race_id, pole_driver_id, p1_driver_id, p2_driver_id, p3_driver_id, random_pos_driver_id, bortoleto_position, profiles(username)')
+      .select('id, user_id, race_id, pole_driver_id, p1_driver_id, p2_driver_id, p3_driver_id, random_pos_driver_id, bortoleto_position, challenge_answer, profiles(username)')
       .eq('race_id', raceId),
     supabase.from('profiles').select('id, username'),
   ])
 
   if (!race) return NextResponse.json({ error: 'Corrida não encontrada' }, { status: 404 })
-  if (!race.openf1_race_session_key) return NextResponse.json({ error: 'Sessão OpenF1 não configurada' }, { status: 400 })
 
   const drivers = driversRaw ?? []
-  const driverByNumber = new Map(drivers.map(d => [d.number, d]))
   const driverById = new Map(drivers.map(d => [d.id, d]))
+  const driverByNumber = new Map(drivers.map(d => [d.number, d]))
 
-  // Fetch live race positions (or generate fake ones in demo mode)
-  let racePositions: Awaited<ReturnType<typeof getFinalPositions>> = []
+  // Match ESPN display name → driver in our DB (by last name or full name)
+  function findDriverByName(displayName: string) {
+    const lower = displayName.toLowerCase()
+    // Try exact match first
+    let found = drivers.find(d => d.name.toLowerCase() === lower)
+    if (!found) {
+      // Try last name match
+      const lastName = lower.split(' ').pop() ?? ''
+      found = drivers.find(d => d.name.toLowerCase().endsWith(lastName))
+    }
+    return found ?? null
+  }
+
+  type LivePosition = { driverName: string; position: number }
+  let livePositions: LivePosition[] = []
   let poleDriverId: string | null = null
+  let hasData = false
 
   if (isDemo) {
-    // Shuffle real drivers into random positions for simulation
     const shuffled = [...drivers].sort(() => Math.random() - 0.5)
-    racePositions = shuffled.map((d, i) => ({
-      driver_number: d.number,
-      position: i + 1,
-      session_key: 0,
-      date: new Date().toISOString(),
-    }))
-    // Pick a random pole driver
+    livePositions = shuffled.map((d, i) => ({ driverName: d.name, position: i + 1 }))
     poleDriverId = drivers[Math.floor(Math.random() * drivers.length)]?.id ?? null
+    hasData = true
   } else {
-    if (!race.openf1_race_session_key) {
-      return NextResponse.json({ error: 'Sessão OpenF1 não configurada' }, { status: 400 })
-    }
+    // Try ESPN first (works during live sessions without auth)
     try {
-      racePositions = await getFinalPositions(race.openf1_race_session_key)
-    } catch {
-      return NextResponse.json({ error: 'Falha ao buscar dados OpenF1' }, { status: 502 })
-    }
-    if (race.openf1_quali_session_key) {
+      const espn = await getEspnPositions(race.race_start_time)
+      if (espn.hasData) {
+        livePositions = espn.racePositions
+        if (espn.poleDriverName) poleDriverId = findDriverByName(espn.poleDriverName)?.id ?? null
+        hasData = true
+      }
+    } catch {}
+
+    // Fallback to OpenF1 (works outside live sessions)
+    if (!hasData && race.openf1_race_session_key) {
       try {
-        const qualiPos = await getFinalPositions(race.openf1_quali_session_key)
-        const pole = qualiPos.find(p => p.position === 1)
-        if (pole) poleDriverId = driverByNumber.get(pole.driver_number)?.id ?? null
+        const openf1Positions = await getFinalPositions(race.openf1_race_session_key)
+        if (openf1Positions.length > 0) {
+          livePositions = openf1Positions.map(p => ({
+            driverName: driverByNumber.get(p.driver_number)?.name ?? `#${p.driver_number}`,
+            position: p.position,
+          }))
+          hasData = true
+        }
       } catch {}
+      if (!hasData && race.openf1_quali_session_key) {
+        try {
+          const qualiPos = await getFinalPositions(race.openf1_quali_session_key)
+          const pole = qualiPos.find(p => p.position === 1)
+          if (pole) poleDriverId = driverByNumber.get(pole.driver_number)?.id ?? null
+        } catch {}
+      }
     }
   }
 
-  const find = (pos: number) => racePositions.find(p => p.position === pos)
+  const findAtPos = (pos: number) => livePositions.find(p => p.position === pos)
   const bortoleto = drivers.find(d => d.is_bortoleto)
-  const bortoletoResult = bortoleto ? racePositions.find(p => p.driver_number === bortoleto.number) : null
+  const bortoletoResult = bortoleto ? livePositions.find(p => p.driverName === bortoleto.name) : null
 
   const liveResult = {
     pole_driver_id: poleDriverId,
-    p1_driver_id: find(1) ? (driverByNumber.get(find(1)!.driver_number)?.id ?? null) : null,
-    p2_driver_id: find(2) ? (driverByNumber.get(find(2)!.driver_number)?.id ?? null) : null,
-    p3_driver_id: find(3) ? (driverByNumber.get(find(3)!.driver_number)?.id ?? null) : null,
-    random_pos_driver_id: race.random_position && find(race.random_position)
-      ? (driverByNumber.get(find(race.random_position!)!.driver_number)?.id ?? null)
+    p1_driver_id: findDriverByName(findAtPos(1)?.driverName ?? '')?.id ?? null,
+    p2_driver_id: findDriverByName(findAtPos(2)?.driverName ?? '')?.id ?? null,
+    p3_driver_id: findDriverByName(findAtPos(3)?.driverName ?? '')?.id ?? null,
+    random_pos_driver_id: race.random_position && findAtPos(race.random_position)
+      ? (findDriverByName(findAtPos(race.random_position!)!.driverName)?.id ?? null)
       : null,
     bortoleto_position: bortoletoResult?.position ?? null,
   }
 
   const abbr = (id: string | null) => id ? (driverById.get(id)?.abbreviation ?? '?') : '—'
 
-  function randomPick<T>(arr: T[]): T { return arr[Math.floor(Math.random() * arr.length)] }
-
-  type FakePred = {
-    pole_driver_id: string | null; p1_driver_id: string | null
-    p2_driver_id: string | null; p3_driver_id: string | null
-    random_pos_driver_id: string | null; bortoleto_position: number | null
-  }
-
-  function makeFakePred(): FakePred {
+  function makeFakePred() {
     const ids = drivers.map(d => d.id)
     const shuffled = [...ids].sort(() => Math.random() - 0.5)
+    const picks = [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20]
     return {
       pole_driver_id: shuffled[0] ?? null,
       p1_driver_id: shuffled[1] ?? null,
       p2_driver_id: shuffled[2] ?? null,
       p3_driver_id: shuffled[3] ?? null,
       random_pos_driver_id: shuffled[4] ?? null,
-      bortoleto_position: randomPick([1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20]),
+      bortoleto_position: picks[Math.floor(Math.random() * picks.length)],
     }
   }
 
@@ -103,16 +181,23 @@ export async function GET(req: NextRequest) {
     pole_driver_id: string | null; p1_driver_id: string | null
     p2_driver_id: string | null; p3_driver_id: string | null
     random_pos_driver_id: string | null; bortoleto_position: number | null
+    challenge_answer: string | null
     profiles: { username: string } | null
   }
 
   const leaderboardSource = isDemo
-    ? (profilesRaw ?? []).map(p => ({ ...makeFakePred(), username: p.username }))
+    ? (profilesRaw ?? []).map(p => ({ ...makeFakePred(), challenge_answer: null, username: p.username }))
     : ((predictionsRaw ?? []) as PredRow[]).map(pred => ({ ...pred, username: pred.profiles?.username ?? '?' }))
+
+  const challengeCorrect = race.challenge_correct ?? null
 
   const leaderboard = leaderboardSource
     .map(entry => {
-      const score = calculateScore(entry as unknown as Parameters<typeof calculateScore>[0], liveResult as unknown as Parameters<typeof calculateScore>[1])
+      const score = calculateScore(
+        entry as unknown as Parameters<typeof calculateScore>[0],
+        liveResult as unknown as Parameters<typeof calculateScore>[1],
+        challengeCorrect,
+      )
       return {
         username: entry.username,
         total: score.total_points,
@@ -122,6 +207,7 @@ export async function GET(req: NextRequest) {
         p3: score.p3_points,
         random: score.random_pos_points,
         bortoleto: score.bortoleto_points,
+        challenge: score.challenge_points,
         picks: {
           pole: abbr(entry.pole_driver_id),
           p1: abbr(entry.p1_driver_id),
@@ -129,6 +215,7 @@ export async function GET(req: NextRequest) {
           p3: abbr(entry.p3_driver_id),
           random: abbr(entry.random_pos_driver_id),
           bortoleto: entry.bortoleto_position !== null ? `P${entry.bortoleto_position}` : '—',
+          challenge: entry.challenge_answer ?? '—',
         },
       }
     })
@@ -139,10 +226,12 @@ export async function GET(req: NextRequest) {
     isDemo,
     raceName: race.name,
     randomPosition: race.random_position,
-    hasData: racePositions.length > 0,
-    currentPositions: racePositions.slice(0, 20).map(p => ({
+    challengeQuestion: race.challenge_question ?? null,
+    challengeCorrect: race.challenge_correct ?? null,
+    hasData,
+    currentPositions: livePositions.slice(0, 22).map(p => ({
       position: p.position,
-      abbreviation: driverByNumber.get(p.driver_number)?.abbreviation ?? `#${p.driver_number}`,
+      abbreviation: findDriverByName(p.driverName)?.abbreviation ?? p.driverName.split(' ').pop() ?? '?',
     })),
     liveResult: {
       pole: abbr(liveResult.pole_driver_id),

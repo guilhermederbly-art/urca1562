@@ -21,6 +21,7 @@ export default function Navbar({ username, isAdmin }: { username: string; isAdmi
   const links = [
     { href: '/dashboard',    label: 'Corridas' },
     { href: '/leaderboard',  label: 'Ranking' },
+    { href: '/campeonato',   label: 'F1' },
     { href: '/regras',       label: 'Regras' },
     { href: '/perfil',       label: 'Perfil' },
     ...(isAdmin ? [{ href: '/admin', label: 'Admin' }] : []),

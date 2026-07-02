@@ -8,11 +8,15 @@ interface LiveResult {
   pole: string; p1: string; p2: string; p3: string; random: string; bortoleto: string
 }
 
+interface PicksRow {
+  pole: string; p1: string; p2: string; p3: string; random: string; bortoleto: string; challenge: string
+}
+
 interface LeaderboardRow {
   username: string
   total: number
-  pole: number; p1: number; p2: number; p3: number; random: number; bortoleto: number
-  picks: LiveResult
+  pole: number; p1: number; p2: number; p3: number; random: number; bortoleto: number; challenge: number
+  picks: PicksRow
   rank?: number
   prevRank?: number
 }
@@ -22,6 +26,8 @@ interface LiveData {
   isDemo: boolean
   raceName: string
   randomPosition: number | null
+  challengeQuestion: string | null
+  challengeCorrect: string | null
   hasData: boolean
   currentPositions: { position: number; abbreviation: string }[]
   liveResult: LiveResult
@@ -30,7 +36,7 @@ interface LiveData {
   error?: string
 }
 
-const POLL_INTERVAL = 10_000
+const POLL_INTERVAL = 3_000
 
 export default function AoVivoPage() {
   const { id } = useParams<{ id: string }>()
@@ -41,6 +47,7 @@ export default function AoVivoPage() {
   const [secondsAgo, setSecondsAgo] = useState(0)
   const [error, setError] = useState('')
   const lastUpdatedRef = useRef<string | null>(null)
+  const dataRef = useRef<LiveData | null>(null)
 
   async function fetchLive() {
     try {
@@ -49,14 +56,16 @@ export default function AoVivoPage() {
       const json: LiveData = await res.json()
       if (!res.ok) { setError(json.error ?? 'Erro'); return }
 
-      // Track rank movement
-      if (data?.leaderboard) {
-        const cur = new Map(data.leaderboard.map((r, i) => [r.username, i + 1]))
+      // Track rank movement using ref to avoid stale closure
+      if (dataRef.current?.leaderboard) {
+        const cur = new Map(dataRef.current.leaderboard.map((r, i) => [r.username, i + 1]))
         setPrevRanks(cur)
       }
 
       const ranked = json.leaderboard.map((row, i) => ({ ...row, rank: i + 1 }))
-      setData({ ...json, leaderboard: ranked })
+      const next = { ...json, leaderboard: ranked }
+      dataRef.current = next
+      setData(next)
       lastUpdatedRef.current = json.lastUpdated
       setSecondsAgo(0)
     } catch {
@@ -66,8 +75,15 @@ export default function AoVivoPage() {
 
   useEffect(() => {
     fetchLive()
-    const poll = setInterval(fetchLive, POLL_INTERVAL)
-    return () => clearInterval(poll)
+    const poll = setInterval(() => {
+      if (document.visibilityState === 'visible') fetchLive()
+    }, POLL_INTERVAL)
+    const onVisible = () => { if (document.visibilityState === 'visible') fetchLive() }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => {
+      clearInterval(poll)
+      document.removeEventListener('visibilitychange', onVisible)
+    }
   }, [id])
 
   // Countdown since last update
@@ -144,6 +160,12 @@ export default function AoVivoPage() {
                 🎲 Posição aleatória: P{data.randomPosition}
               </span>
             )}
+            {data.challengeQuestion && (
+              <span className="text-xs font-bold" style={{ color: '#fbbf24' }}>
+                ⚡ {data.challengeQuestion}
+                {data.challengeCorrect && <span style={{ color: '#22c55e' }}> → {data.challengeCorrect}</span>}
+              </span>
+            )}
             {demo && (
               <span className="text-xs" style={{ color: '#a78bfa' }}>
                 Posições aleatórias — apenas visualização
@@ -151,7 +173,6 @@ export default function AoVivoPage() {
             )}
           </div>
         </div>
-        <style>{`@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.6} }`}</style>
       </div>
 
       {!data.hasData ? (
@@ -217,7 +238,7 @@ export default function AoVivoPage() {
                   { label: 'P1', val: data.liveResult.p1 },
                   { label: 'P2', val: data.liveResult.p2 },
                   { label: 'P3', val: data.liveResult.p3 },
-                  { label: `🎲 P${data.randomPosition}`, val: data.liveResult.random },
+                  { label: `🎲 P${data.randomPosition}`, val: data.liveResult.random || 'DNF' },
                   { label: '🇧🇷 BOR', val: data.liveResult.bortoleto },
                 ].map(({ label, val }) => (
                   <div key={label} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
@@ -254,6 +275,9 @@ export default function AoVivoPage() {
                     <th className="text-center px-2 py-2 text-xs font-bold uppercase tracking-widest" style={{ color: 'var(--f1-muted)' }}>P3</th>
                     <th className="text-center px-2 py-2 text-xs font-bold uppercase tracking-widest" style={{ color: 'var(--f1-muted)' }}>🎲</th>
                     <th className="text-center px-2 py-2 text-xs font-bold uppercase tracking-widest" style={{ color: 'var(--f1-muted)' }}>🇧🇷</th>
+                    {data.challengeQuestion && (
+                      <th className="text-center px-2 py-2 text-xs font-bold uppercase tracking-widest" style={{ color: 'var(--f1-gold)' }}>⚡</th>
+                    )}
                   </tr>
                 </thead>
                 <tbody>
@@ -294,6 +318,9 @@ export default function AoVivoPage() {
                         <td className="text-center px-1 py-2">{ptChip(row.p3, 3, row.picks.p3)}</td>
                         <td className="text-center px-1 py-2">{ptChip(row.random, 4, row.picks.random)}</td>
                         <td className="text-center px-1 py-2">{ptChip(row.bortoleto, 4, row.picks.bortoleto)}</td>
+                        {data.challengeQuestion && (
+                          <td className="text-center px-1 py-2">{ptChip(row.challenge, 1, row.picks.challenge)}</td>
+                        )}
                       </tr>
                     )
                   })}

@@ -1,3 +1,5 @@
+export const metadata = { title: 'Regras — F1 Bolão' }
+
 export default function RegrasPage() {
   return (
     <div className="max-w-2xl mx-auto">
@@ -61,6 +63,7 @@ export default function RegrasPage() {
               { icon: '🥉', label: '3º Lugar (P3)',        desc: 'Quem vai completar o pódio?' },
               { icon: '🎲', label: 'Posição Aleatória',    desc: 'Uma posição sorteada (P4 a P20) — quem termina nessa posição?' },
               { icon: '🇧🇷', label: 'Posição do Bortoleto', desc: 'Em que posição Gabriel Bortoleto vai terminar a corrida?' },
+              { icon: '⚡', label: 'Desafio da Rodada',    desc: 'Uma pergunta surpresa por GP — resposta certa vale 1 ponto extra.' },
             ].map(({ icon, label, desc }) => (
               <div key={label} className="flex items-start gap-3">
                 <span className="text-xl flex-shrink-0 mt-0.5">{icon}</span>
@@ -88,6 +91,7 @@ export default function RegrasPage() {
               { cat: '3º Lugar (P3)',        exact: '3 pts', partial: '1 pt', note: 'Piloto acertado mas em outra posição do pódio' },
               { cat: 'Posição Aleatória',    exact: '4 pts', partial: '—',    note: 'Somente acerto exato' },
               { cat: 'Posição do Bortoleto', exact: '4 pts', partial: '—',    note: 'Somente acerto exato' },
+              { cat: '⚡ Desafio da Rodada', exact: '1 pt',  partial: '—',    note: 'Somente acerto exato' },
             ].map(({ cat, exact, partial, note }) => (
               <div key={cat} className="px-6 py-3 flex items-center gap-4">
                 <div className="flex-1 text-sm font-semibold text-white">{cat}</div>
@@ -113,7 +117,7 @@ export default function RegrasPage() {
           <div className="px-6 py-4" style={{ background: 'rgba(0,0,0,0.2)', borderTop: '1px solid var(--f1-border)' }}>
             <div className="flex items-center justify-between text-sm">
               <span style={{ color: 'var(--f1-muted)' }}>Pontuação máxima por corrida</span>
-              <span className="font-black text-white text-base">19 pontos</span>
+              <span className="font-black text-white text-base">20 pontos</span>
             </div>
           </div>
         </section>
@@ -140,6 +144,31 @@ export default function RegrasPage() {
             Todo GP tem um palpite especial: em que <strong className="text-white">posição exata</strong> Bortoleto vai terminar?
             Vale 3 pontos para quem acertar certinho.
           </p>
+        </section>
+
+        {/* Desafio da Rodada */}
+        <section className="card overflow-hidden" style={{ borderColor: 'rgba(255,192,0,0.3)' }}>
+          <div className="striped-accent-thick" style={{ background: 'linear-gradient(90deg, rgba(255,192,0,0.8) 0%, rgba(255,192,0,0.3) 100%)' }} />
+          <div className="p-6">
+            <h2 className="font-black text-white text-lg uppercase tracking-wide mb-3" style={{ letterSpacing: '0.08em' }}>
+              ⚡ Desafio da Rodada
+            </h2>
+            <p className="text-sm mb-3" style={{ color: 'var(--f1-muted)', lineHeight: '1.7' }}>
+              A cada corrida, uma <strong className="text-white">pergunta surpresa</strong> é sorteada automaticamente.
+              Ela aparece junto com seus palpites e vale <strong className="text-white">+1 ponto extra</strong> para quem acertar.
+            </p>
+            <p className="text-sm mb-4" style={{ color: 'var(--f1-muted)', lineHeight: '1.7' }}>
+              Exemplos de perguntas: <em>"Haverá Safety Car nesta corrida?"</em>, <em>"O pole vai vencer?"</em>,
+              <em>"Quantas paradas vai fazer o vencedor?"</em>. A resposta correta é registrada após a corrida
+              e os pontos são distribuídos automaticamente.
+            </p>
+            <div
+              className="p-3 rounded text-xs font-semibold"
+              style={{ background: 'rgba(255,192,0,0.08)', color: 'rgba(255,192,0,0.9)', border: '1px solid rgba(255,192,0,0.25)' }}
+            >
+              ⚡ A pergunta é a mesma para todos — e muda a cada GP!
+            </div>
+          </div>
         </section>
 
         {/* Pódio parcial */}

@@ -4,9 +4,9 @@ export interface Database {
   public: {
     Tables: {
       profiles: {
-        Row: { id: string; username: string; created_at: string }
-        Insert: { id: string; username: string; created_at?: string }
-        Update: { username?: string }
+        Row: { id: string; username: string; created_at: string; last_seen_at: string | null }
+        Insert: { id: string; username: string; created_at?: string; last_seen_at?: string | null }
+        Update: { username?: string; last_seen_at?: string | null }
         Relationships: []
       }
       drivers: {
@@ -25,6 +25,7 @@ export interface Database {
           random_position: number | null; openf1_quali_session_key: number | null
           openf1_race_session_key: number | null
           status: 'upcoming' | 'open' | 'closed' | 'finished'; created_at: string
+          challenge_question: string | null; challenge_options: string[] | null; challenge_correct: string | null
         }
         Insert: {
           round_number: number; name: string; circuit: string; country: string
@@ -32,12 +33,14 @@ export interface Database {
           random_position?: number | null; openf1_quali_session_key?: number | null
           openf1_race_session_key?: number | null; status?: 'upcoming' | 'open' | 'closed' | 'finished'
           id?: string; created_at?: string
+          challenge_question?: string | null; challenge_options?: string[] | null; challenge_correct?: string | null
         }
         Update: {
           round_number?: number; name?: string; circuit?: string; country?: string
           fp1_start_time?: string | null; qualifying_start_time?: string; race_start_time?: string
           random_position?: number | null; openf1_quali_session_key?: number | null
           openf1_race_session_key?: number | null; status?: 'upcoming' | 'open' | 'closed' | 'finished'
+          challenge_question?: string | null; challenge_options?: string[] | null; challenge_correct?: string | null
         }
         Relationships: []
       }
@@ -70,6 +73,7 @@ export interface Database {
           pole_driver_id: string | null; p1_driver_id: string | null
           p2_driver_id: string | null; p3_driver_id: string | null
           random_pos_driver_id: string | null; bortoleto_position: number | null
+          challenge_answer: string | null
           created_at: string; updated_at: string
         }
         Insert: {
@@ -77,12 +81,14 @@ export interface Database {
           pole_driver_id?: string | null; p1_driver_id?: string | null
           p2_driver_id?: string | null; p3_driver_id?: string | null
           random_pos_driver_id?: string | null; bortoleto_position?: number | null
+          challenge_answer?: string | null
           id?: string; created_at?: string; updated_at?: string
         }
         Update: {
           pole_driver_id?: string | null; p1_driver_id?: string | null
           p2_driver_id?: string | null; p3_driver_id?: string | null
           random_pos_driver_id?: string | null; bortoleto_position?: number | null
+          challenge_answer?: string | null
           updated_at?: string
         }
         Relationships: []
@@ -92,18 +98,18 @@ export interface Database {
           id: string; user_id: string; race_id: string
           pole_points: number; p1_points: number; p2_points: number
           p3_points: number; random_pos_points: number; bortoleto_points: number
-          total_points: number
+          challenge_points: number; total_points: number
         }
         Insert: {
           user_id: string; race_id: string
           pole_points?: number; p1_points?: number; p2_points?: number
           p3_points?: number; random_pos_points?: number; bortoleto_points?: number
-          total_points?: number; id?: string
+          challenge_points?: number; total_points?: number; id?: string
         }
         Update: {
           pole_points?: number; p1_points?: number; p2_points?: number
           p3_points?: number; random_pos_points?: number; bortoleto_points?: number
-          total_points?: number
+          challenge_points?: number; total_points?: number
         }
         Relationships: []
       }

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { getFinalPositions } from '@/lib/openf1'
 import { calculateScore } from '@/lib/scoring'
+import { pickRandomChallenge } from '@/lib/challengeBank'
 import type { Prediction, Race } from '@/lib/types/database'
 
 // GET /api/cron/update
@@ -22,6 +23,9 @@ export async function GET(req: NextRequest) {
   const supabase = await createServiceClient()
   const now = new Date()
   const log: string[] = []
+
+  // ── 0. Auto-assign OpenF1 session keys for races missing them ─────────────
+  await autoAssignSessionKeys(supabase, log)
 
   // ── 1. Close predictions for races where FP1 has started ──────────────────
   const { data: openRaces } = await supabase
@@ -63,16 +67,83 @@ export async function GET(req: NextRequest) {
 
       if (nextRace) {
         const randomPosition = Math.floor(Math.random() * 17) + 4 // P4–P20
+        const challenge = pickRandomChallenge()
         await supabase
           .from('races')
-          .update({ status: 'open', random_position: randomPosition })
+          .update({
+            status: 'open',
+            random_position: randomPosition,
+            challenge_question: challenge.question,
+            challenge_options: challenge.options,
+            challenge_correct: null,
+          })
           .eq('id', (nextRace as Race).id)
-        log.push(`Opened predictions for: ${(nextRace as Race).name} (P${randomPosition} aleatória)`)
+        log.push(`Opened predictions for: ${(nextRace as Race).name} (P${randomPosition} aleatória · desafio: "${challenge.question}")`)
       }
     }
   }
 
   return NextResponse.json({ ok: true, timestamp: now.toISOString(), log })
+}
+
+async function autoAssignSessionKeys(
+  supabase: Awaited<ReturnType<typeof createServiceClient>>,
+  log: string[]
+) {
+  const { data: racesWithoutKeys } = await supabase
+    .from('races')
+    .select('*')
+    .in('status', ['closed', 'open'])
+    .is('openf1_race_session_key', null)
+
+  if (!(racesWithoutKeys ?? []).length) return
+
+  try {
+    const res = await fetch('https://api.openf1.org/v1/sessions?year=2026')
+    if (!res.ok) return
+    const sessions = await res.json() as {
+      session_key: number; session_type: string
+      meeting_key: number; country_name: string; date_start: string
+    }[]
+
+    const byMeeting = new Map<number, { race?: (typeof sessions)[0]; quali?: (typeof sessions)[0] }>()
+    for (const s of sessions) {
+      const g = byMeeting.get(s.meeting_key) ?? {}
+      if (s.session_type === 'Race') g.race = s
+      if (s.session_type === 'Qualifying') g.quali = s
+      byMeeting.set(s.meeting_key, g)
+    }
+
+    for (const race of (racesWithoutKeys as Race[] ?? [])) {
+      const raceDate = new Date(race.race_start_time)
+      let bestKey: number | null = null
+      let bestQualiKey: number | null = null
+      let bestDiff = Infinity
+
+      for (const [, g] of byMeeting) {
+        if (!g.race) continue
+        const diff = Math.abs(new Date(g.race.date_start).getTime() - raceDate.getTime())
+        const countryMatch = race.country &&
+          (g.race.country_name.toLowerCase().includes(race.country.toLowerCase()) ||
+           race.country.toLowerCase().includes(g.race.country_name.toLowerCase()))
+        if (diff < 36 * 60 * 60 * 1000 && countryMatch && diff < bestDiff) {
+          bestKey = g.race.session_key
+          bestQualiKey = g.quali?.session_key ?? null
+          bestDiff = diff
+        }
+      }
+
+      if (bestKey) {
+        await supabase.from('races').update({
+          openf1_race_session_key: bestKey,
+          openf1_quali_session_key: bestQualiKey,
+        }).eq('id', race.id)
+        log.push(`Auto-assigned session keys for: ${race.name} (race: ${bestKey}, quali: ${bestQualiKey ?? 'none'})`)
+      }
+    }
+  } catch (err) {
+    log.push(`Error auto-assigning session keys: ${err}`)
+  }
 }
 
 async function tryImportResults(
@@ -157,7 +228,7 @@ async function tryImportResults(
         const scoreUpserts = (predictions as Prediction[]).map(pred => ({
           user_id: pred.user_id,
           race_id: race.id,
-          ...calculateScore(pred, savedResult),
+          ...calculateScore(pred, savedResult, race.challenge_correct),
         }))
         await supabase.from('scores').upsert(scoreUpserts, { onConflict: 'user_id,race_id' })
       }

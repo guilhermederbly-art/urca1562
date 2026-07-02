@@ -2,8 +2,7 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import AdminPanel from '@/components/AdminPanel'
-
-const ADMIN_EMAIL = 'guilherme.derbly@gmail.com'
+import { ADMIN_EMAIL } from '@/lib/config'
 
 export default async function AdminPage() {
   const supabase = await createClient()
@@ -16,17 +15,29 @@ export default async function AdminPage() {
   const [{ data: races }, { data: drivers }, { data: profiles }] = await Promise.all([
     supabase.from('races').select('*').order('round_number'),
     supabase.from('drivers').select('*').order('number'),
-    serviceSupabase.from('profiles').select('id, username, created_at').order('created_at'),
+    serviceSupabase.from('profiles').select('id, username, created_at, last_seen_at').order('created_at'),
   ])
 
   // Get auth users list to cross-reference emails
   const { data: authUsers } = await serviceSupabase.auth.admin.listUsers()
-  const emailById = new Map(authUsers?.users.map(u => [u.id, u.email ?? '']) ?? [])
+  const authById = new Map(authUsers?.users.map(u => [u.id, u]) ?? [])
 
   const users = (profiles ?? []).map(p => ({
     ...p,
-    email: emailById.get(p.id) ?? '',
+    email: authById.get(p.id)?.email ?? '',
+    last_seen_at: p.last_seen_at ?? null,
   }))
+
+  // Fetch predictions for the currently open race (if any)
+  const openRace = (races ?? []).find(r => r.status === 'open')
+  let predictedUserIds: string[] = []
+  if (openRace) {
+    const { data: preds } = await serviceSupabase
+      .from('predictions')
+      .select('user_id')
+      .eq('race_id', openRace.id)
+    predictedUserIds = (preds ?? []).map(p => p.user_id)
+  }
 
   return (
     <div>
@@ -36,7 +47,13 @@ export default async function AdminPage() {
           Gerencie corridas, palpites, resultados e usuários
         </p>
       </div>
-      <AdminPanel races={races ?? []} drivers={drivers ?? []} users={users} />
+      <AdminPanel
+        races={races ?? []}
+        drivers={drivers ?? []}
+        users={users}
+        openRaceName={openRace?.name}
+        predictedUserIds={predictedUserIds}
+      />
     </div>
   )
 }

@@ -12,10 +12,10 @@ export async function GET(req: NextRequest) {
   const [{ data: predictionsRaw }, { data: drivers }, { data: race }] = await Promise.all([
     supabase
       .from('predictions')
-      .select('pole_driver_id, p1_driver_id, p2_driver_id, p3_driver_id, random_pos_driver_id, bortoleto_position, profiles(username)')
+      .select('pole_driver_id, p1_driver_id, p2_driver_id, p3_driver_id, random_pos_driver_id, bortoleto_position, challenge_answer, profiles(username)')
       .eq('race_id', raceId),
     supabase.from('drivers').select('id, abbreviation'),
-    supabase.from('races').select('status, random_position').eq('id', raceId).single(),
+    supabase.from('races').select('status, random_position, challenge_question').eq('id', raceId).single(),
   ])
 
   if (!race || (race.status !== 'closed' && race.status !== 'finished')) {
@@ -31,6 +31,7 @@ export async function GET(req: NextRequest) {
     p3_driver_id: string | null
     random_pos_driver_id: string | null
     bortoleto_position: number | null
+    challenge_answer: string | null
     profiles: { username: string } | null
   }
 
@@ -42,7 +43,8 @@ export async function GET(req: NextRequest) {
     p3:   driverMap.get(p.p3_driver_id ?? '') ?? '—',
     random_pos: driverMap.get(p.random_pos_driver_id ?? '') ?? '—',
     bortoleto_position: p.bortoleto_position ?? '—',
+    challenge_answer: p.challenge_answer ?? '—',
   }))
 
-  return NextResponse.json({ ok: true, predictions: result, random_position: race.random_position })
+  return NextResponse.json({ ok: true, predictions: result, random_position: race.random_position, challenge_question: race.challenge_question })
 }

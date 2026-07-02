@@ -3,6 +3,8 @@ import { createClient } from '@/lib/supabase/server'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 
+export const metadata = { title: 'Meu Perfil — F1 Bolão' }
+
 export default async function PerfilPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -14,12 +16,14 @@ export default async function PerfilPage() {
     { data: driversRaw },
     { data: scoresRaw },
     { data: profileRaw },
+    { data: allScoresRaw },
   ] = await Promise.all([
     supabase.from('predictions').select('*').eq('user_id', user.id),
     supabase.from('races').select('*').order('round_number', { ascending: true }),
     supabase.from('drivers').select('id, abbreviation'),
     supabase.from('scores').select('*').eq('user_id', user.id),
     supabase.from('profiles').select('username').eq('id', user.id).single(),
+    supabase.from('scores').select('user_id, race_id, total_points'),
   ])
 
   const predictions = predictionsRaw ?? []
@@ -64,9 +68,11 @@ export default async function PerfilPage() {
   let p2Exact = 0, p2Partial = 0
   let p3Exact = 0, p3Partial = 0
   let randomCorrect = 0, bortoletoCorrect = 0
+  let challengeCorrect = 0, challengeTotal = 0
 
   finishedWithPred.forEach(p => {
     const s = scoreMap.get(p.race_id)
+    const race = raceMap.get(p.race_id)
     if (!s) return
     if (s.pole_points > 0) poleCorrect++
     if (s.p1_points === 3) p1Exact++; else if (s.p1_points === 1) p1Partial++
@@ -74,9 +80,37 @@ export default async function PerfilPage() {
     if (s.p3_points === 3) p3Exact++; else if (s.p3_points === 1) p3Partial++
     if (s.random_pos_points > 0) randomCorrect++
     if (s.bortoleto_points > 0) bortoletoCorrect++
+    if (race?.challenge_question) {
+      challengeTotal++
+      if (s.challenge_points > 0) challengeCorrect++
+    }
   })
 
   const pct = (n: number) => racesPlayed > 0 ? Math.round((n / racesPlayed) * 100) : 0
+
+  // Race wins: races where user had highest total_points
+  const allScores = allScoresRaw ?? []
+  const topByRace: Record<string, { userId: string; pts: number }> = {}
+  for (const s of allScores) {
+    const cur = topByRace[s.race_id]
+    if (!cur || s.total_points > cur.pts) {
+      topByRace[s.race_id] = { userId: s.user_id, pts: s.total_points }
+    }
+  }
+  const raceWins = Object.values(topByRace).filter(t => t.userId === user.id && t.pts > 0).length
+
+  // Streak: consecutive finished races (by round_number) where user participated
+  const finishedRacesSorted = races
+    .filter(r => r.status === 'finished')
+    .sort((a, b) => b.round_number - a.round_number)
+  let currentStreak = 0
+  for (const r of finishedRacesSorted) {
+    if (predictions.find(p => p.race_id === r.id)) {
+      currentStreak++
+    } else {
+      break
+    }
+  }
 
   // Histórico ordenado por round desc
   const history = predictions
@@ -112,19 +146,20 @@ export default async function PerfilPage() {
     </div>
   )
 
-  const accRow = (label: string, exact: number, partial: number | null, max: number) => {
-    const pctExact = pct(exact)
+  const accRow = (label: string, exact: number, partial: number | null, max: number, total?: number) => {
+    const denominator = total ?? racesPlayed
+    const pctExact = denominator > 0 ? Math.round((exact / denominator) * 100) : 0
     return (
       <div className="flex items-center justify-between py-3 border-b" style={{ borderColor: 'var(--f1-border)' }}>
         <span className="text-sm font-semibold text-white">{label}</span>
         <div className="flex items-center gap-3">
           {partial !== null && (
             <span className="text-xs" style={{ color: '#ffc000' }}>
-              {partial} parcial{partial !== 1 ? 'is' : ''}
+              {partial} {partial !== 1 ? 'parciais' : 'parcial'}
             </span>
           )}
           <span className="text-xs font-bold" style={{ color: exact > 0 ? '#22c55e' : 'var(--f1-muted)' }}>
-            {exact}/{racesPlayed} exatos
+            {exact}/{denominator} acerto{exact !== 1 ? 's' : ''}
           </span>
           <div style={{
             width: '80px', height: '6px', borderRadius: '3px',
@@ -167,6 +202,42 @@ export default async function PerfilPage() {
         {statCard('Melhor corrida', bestRace ? `${(bestRace as BestRace).points}pts` : '—', bestRace ? (bestRace as BestRace).name : '')}
       </div>
 
+      {/* Streak + wins row */}
+      {racesPlayed > 0 && (
+        <div className="grid grid-cols-2 gap-3">
+          <div className="card p-4 flex items-center gap-3">
+            <span className="text-3xl">{currentStreak >= 3 ? '🔥' : '📅'}</span>
+            <div>
+              <div className="text-xs font-bold uppercase tracking-widest mb-0.5" style={{ color: 'var(--f1-muted)' }}>Sequência atual</div>
+              <div className="text-2xl font-black text-white leading-none">
+                {currentStreak}
+                <span className="text-sm font-normal ml-1" style={{ color: 'var(--f1-muted)' }}>
+                  {currentStreak === 1 ? 'corrida' : 'corridas'}
+                </span>
+              </div>
+              {currentStreak >= 3 && (
+                <div className="text-xs mt-0.5" style={{ color: '#f97316' }}>Em chamas! 🔥</div>
+              )}
+            </div>
+          </div>
+          <div className="card p-4 flex items-center gap-3">
+            <span className="text-3xl">🏆</span>
+            <div>
+              <div className="text-xs font-bold uppercase tracking-widest mb-0.5" style={{ color: 'var(--f1-muted)' }}>Corridas vencidas</div>
+              <div className="text-2xl font-black leading-none" style={{ color: raceWins > 0 ? 'var(--f1-gold)' : 'white' }}>
+                {raceWins}
+                <span className="text-sm font-normal ml-1" style={{ color: 'var(--f1-muted)' }}>
+                  {raceWins === 1 ? 'vitória' : 'vitórias'}
+                </span>
+              </div>
+              {raceWins === 0 && racesPlayed > 0 && (
+                <div className="text-xs mt-0.5" style={{ color: 'var(--f1-muted)' }}>Ainda sem vitórias</div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Accuracy section */}
       {racesPlayed > 0 && (
         <div className="card overflow-hidden">
@@ -181,10 +252,13 @@ export default async function PerfilPage() {
             {accRow('1º Lugar', p1Exact, p1Partial, 3)}
             {accRow('2º Lugar', p2Exact, p2Partial, 3)}
             {accRow('3º Lugar', p3Exact, p3Partial, 3)}
-            {accRow('Posição Aleatória', randomCorrect, null, 4)}
-            <div className="border-0">
-              {accRow('Bortoleto', bortoletoCorrect, null, 4)}
-            </div>
+            {accRow('Posição Aleatória 🎲', randomCorrect, null, 4)}
+            {accRow('Bortoleto 🇧🇷', bortoletoCorrect, null, 4)}
+            {challengeTotal > 0 && (
+              <div className="border-0">
+                {accRow('Desafio ⚡', challengeCorrect, null, 1, challengeTotal)}
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -250,6 +324,13 @@ export default async function PerfilPage() {
                 pts: score?.bortoleto_points ?? null,
                 maxPts: 4,
               },
+              ...(race.challenge_question ? [{
+                label: '⚡',
+                pick: prediction.challenge_answer ?? '—',
+                actual: hasResult ? (race.challenge_correct ?? null) : null,
+                pts: score?.challenge_points ?? null,
+                maxPts: 1,
+              }] : []),
             ]
 
             return (
@@ -291,6 +372,14 @@ export default async function PerfilPage() {
                         )}
                       </div>
                     </div>
+
+                    {/* Challenge question */}
+                    {race.challenge_question && (
+                      <div className="text-xs mb-2" style={{ color: 'var(--f1-muted)' }}>
+                        <span style={{ color: 'var(--f1-red)', fontWeight: 700 }}>⚡</span>{' '}
+                        {race.challenge_question}
+                      </div>
+                    )}
 
                     {/* Category chips */}
                     <div className="flex flex-wrap gap-1.5">

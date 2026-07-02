@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
+import { F1_LOGO_SRC } from '@/lib/f1logo'
 
 export default function LoginPage() {
   const router = useRouter()
@@ -47,19 +48,8 @@ export default function LoginPage() {
         {/* Header */}
         <div className="text-center mb-10">
           <div className="inline-flex items-center gap-3 mb-5">
-            <div
-              className="flex items-center justify-center h-10 px-3"
-              style={{
-                backgroundColor: 'var(--f1-red)',
-                clipPath: 'polygon(0 0, calc(100% - 6px) 0, 100% 6px, 100% 100%, 6px 100%, 0 calc(100% - 6px))',
-              }}
-            >
-              <span className="font-black text-white text-xl" style={{ fontStyle: 'italic' }}>F1</span>
-            </div>
-            <span
-              className="font-black text-white text-2xl"
-              style={{ fontStyle: 'italic', letterSpacing: '0.12em', textTransform: 'uppercase' }}
-            >
+            <img src={F1_LOGO_SRC} alt="F1 Bolão" style={{ height: '40px', width: '40px', borderRadius: '8px' }} />
+            <span className="f1-brand text-white text-2xl">
               Bolão
             </span>
           </div>

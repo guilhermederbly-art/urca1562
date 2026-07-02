@@ -1,5 +1,10 @@
 const BASE_URL = 'https://api.openf1.org/v1'
 
+function authHeaders(): HeadersInit {
+  const key = process.env.OPENF1_API_KEY
+  return key ? { Authorization: `Bearer ${key}` } : {}
+}
+
 export interface OpenF1Session {
   session_key: number
   session_name: string
@@ -27,14 +32,14 @@ export interface OpenF1Driver {
 }
 
 export async function getSessionsByYear(year: number): Promise<OpenF1Session[]> {
-  const res = await fetch(`${BASE_URL}/sessions?year=${year}`)
+  const res = await fetch(`${BASE_URL}/sessions?year=${year}`, { headers: authHeaders() })
   if (!res.ok) throw new Error('Failed to fetch OpenF1 sessions')
   return res.json()
 }
 
 export async function getFinalPositions(sessionKey: number): Promise<OpenF1Position[]> {
   // Get last recorded position per driver
-  const res = await fetch(`${BASE_URL}/position?session_key=${sessionKey}`)
+  const res = await fetch(`${BASE_URL}/position?session_key=${sessionKey}`, { headers: authHeaders() })
   if (!res.ok) throw new Error('Failed to fetch positions')
   const all: OpenF1Position[] = await res.json()
 
@@ -50,7 +55,7 @@ export async function getFinalPositions(sessionKey: number): Promise<OpenF1Posit
 }
 
 export async function getSessionDrivers(sessionKey: number): Promise<OpenF1Driver[]> {
-  const res = await fetch(`${BASE_URL}/drivers?session_key=${sessionKey}`)
+  const res = await fetch(`${BASE_URL}/drivers?session_key=${sessionKey}`, { headers: authHeaders() })
   if (!res.ok) throw new Error('Failed to fetch drivers')
   return res.json()
 }

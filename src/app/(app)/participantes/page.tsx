@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import ParticipantesClient from '@/components/ParticipantesClient'
 
 export default async function ParticipantesPage() {
   const supabase = await createClient()
@@ -57,82 +58,7 @@ export default async function ParticipantesPage() {
         </p>
       </div>
 
-      <div className="card overflow-hidden">
-        <div className="striped-accent-thick" />
-
-        {/* Header */}
-        <div
-          className="grid px-4 py-2 text-xs font-bold uppercase tracking-widest"
-          style={{ color: 'var(--f1-muted)', borderBottom: '1px solid var(--f1-border)', gridTemplateColumns: '3rem 1fr auto auto' }}
-        >
-          <span>#</span>
-          <span>Piloto</span>
-          {openRace && <span className="text-center pr-4">GP atual</span>}
-          <span className="text-right">PTS</span>
-        </div>
-
-        {list.map((p, i) => (
-          <div
-            key={p.id}
-            className="grid px-4 py-3.5 items-center"
-            style={{
-              gridTemplateColumns: '3rem 1fr auto auto',
-              borderBottom: '1px solid var(--f1-border)',
-              backgroundColor: p.isMe ? 'rgba(232,0,45,0.06)' : undefined,
-              borderLeft: p.isMe ? '3px solid var(--f1-red)' : '3px solid transparent',
-            }}
-          >
-            {/* Posição */}
-            <span className="font-black text-sm" style={{ fontStyle: 'italic', color: 'var(--f1-muted)' }}>
-              {String(i + 1).padStart(2, '0')}
-            </span>
-
-            {/* Nome */}
-            <div className="flex items-center gap-2">
-              <span className="font-bold text-sm" style={{ color: p.isMe ? 'white' : 'var(--f1-text)' }}>
-                {p.username}
-              </span>
-              {p.isMe && (
-                <span className="text-xs font-bold uppercase tracking-widest" style={{ color: 'var(--f1-red)' }}>
-                  você
-                </span>
-              )}
-            </div>
-
-            {/* Status GP atual */}
-            {openRace && (
-              <div className="pr-4 flex justify-center">
-                {p.predicted ? (
-                  <span
-                    className="text-xs font-bold uppercase tracking-wider px-2 py-0.5 rounded"
-                    style={{ backgroundColor: 'rgba(0,210,190,0.12)', color: '#00d2be' }}
-                  >
-                    ✓ Enviou
-                  </span>
-                ) : (
-                  <span
-                    className="text-xs font-bold uppercase tracking-wider px-2 py-0.5 rounded"
-                    style={{ backgroundColor: 'rgba(138,138,160,0.1)', color: 'var(--f1-muted)' }}
-                  >
-                    Pendente
-                  </span>
-                )}
-              </div>
-            )}
-
-            {/* Pontos */}
-            <span className="text-right font-black text-lg" style={{ color: p.isMe ? 'var(--f1-red)' : 'var(--f1-text)' }}>
-              {p.points}
-            </span>
-          </div>
-        ))}
-
-        {list.length === 0 && (
-          <p className="p-12 text-center text-sm uppercase tracking-widest" style={{ color: 'var(--f1-muted)' }}>
-            Nenhum participante ainda
-          </p>
-        )}
-      </div>
+      <ParticipantesClient list={list} openRaceName={openRace?.name ?? null} />
     </div>
   )
 }

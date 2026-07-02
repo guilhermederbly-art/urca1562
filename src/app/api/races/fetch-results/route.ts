@@ -93,7 +93,7 @@ export async function POST(req: NextRequest) {
 
   if (predictions && predictions.length > 0) {
     const scoreUpserts = (predictions as Prediction[]).map(pred => {
-      const s = calculateScore(pred, savedResult)
+      const s = calculateScore(pred, savedResult, race.challenge_correct)
       return {
         user_id: pred.user_id,
         race_id: raceId,
