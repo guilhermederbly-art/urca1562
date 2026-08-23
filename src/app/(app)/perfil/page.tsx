@@ -1,4 +1,5 @@
 import { redirect } from 'next/navigation'
+import PageHero from '@/components/PageHero'
 import { createClient } from '@/lib/supabase/server'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
@@ -181,18 +182,12 @@ export default async function PerfilPage() {
   }
 
   return (
-    <main className="container mx-auto max-w-4xl px-4 py-8 flex flex-col gap-6">
-
-      {/* Header */}
-      <div>
-        <div className="text-xs font-bold uppercase tracking-widest mb-1" style={{ color: 'var(--f1-red)' }}>
-          Perfil
-        </div>
-        <h1 className="text-2xl font-black text-white uppercase tracking-wide">{username}</h1>
-        <p className="text-xs mt-0.5" style={{ color: 'var(--f1-muted)' }}>
-          Temporada 2026 · {predictions.length} palpite{predictions.length !== 1 ? 's' : ''} enviado{predictions.length !== 1 ? 's' : ''}
-        </p>
-      </div>
+    <div className="flex flex-col gap-6">
+      <PageHero
+        kicker="Perfil"
+        title={username}
+        subtitle={`Temporada 2026 · ${predictions.length} palpite${predictions.length !== 1 ? 's' : ''} enviado${predictions.length !== 1 ? 's' : ''}`}
+      />
 
       {/* Stat cards */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -429,6 +424,6 @@ export default async function PerfilPage() {
           })}
         </div>
       </div>
-    </main>
+    </div>
   )
 }

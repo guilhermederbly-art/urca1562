@@ -165,37 +165,63 @@ export default function AoVivoPage() {
     : data.leaderboard.filter(r => groups.find(g => g.id === activeGroup)?.memberIds.includes(r.userId))
 
   return (
-    <main className="container mx-auto max-w-4xl px-4 py-6 flex flex-col gap-5">
+    <div className="flex flex-col gap-5">
 
-      {/* Header */}
-      <div className="flex flex-col gap-2">
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex items-center gap-2 flex-wrap">
-            <span style={{
-              background: demo ? '#7c3aed' : data.raceFinished ? '#16a34a' : 'var(--f1-red)',
-              color: 'white',
-              fontSize: '0.65rem', fontWeight: 900,
-              padding: '2px 8px', borderRadius: 3,
-              letterSpacing: '0.12em',
-              animation: (!demo && !data.raceFinished) ? 'pulse 1.5s ease-in-out infinite' : 'none',
-              flexShrink: 0,
-            }}>
-              {demo ? '🎮 SIMULAÇÃO' : data.raceFinished ? '🏁 FINALIZADA' : '🔴 AO VIVO'}
-            </span>
-            {!data.raceFinished && (
-              <span className="text-xs" style={{ color: 'var(--f1-muted)' }}>
-                att. {secondsAgo}s atrás · próx. {Math.max(0, Math.round((POLL_INTERVAL / 1000) - secondsAgo))}s
+      {/* Hero */}
+      <div
+        className="full-bleed -mt-8 relative overflow-hidden"
+        style={{
+          background: 'radial-gradient(ellipse at 25% 0%, #1a1016 0%, #101018 45%, #0d0d14 100%)',
+          borderBottom: '1px solid var(--f1-border)',
+        }}
+      >
+        <div
+          aria-hidden
+          className="absolute top-0 left-0 pointer-events-none"
+          style={{
+            width: '220px',
+            height: '110px',
+            background: 'repeating-linear-gradient(-60deg, var(--f1-red) 0px, var(--f1-red) 14px, #b00022 14px, #b00022 18px, transparent 18px, transparent 36px)',
+            clipPath: 'polygon(0 0, 100% 0, 0 100%)',
+            opacity: 0.9,
+          }}
+        />
+        <div className="container mx-auto max-w-6xl px-4 pt-8 pb-6 relative">
+          <div className="flex items-start justify-between gap-3 mb-3">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span style={{
+                background: demo ? '#7c3aed' : data.raceFinished ? '#16a34a' : 'var(--f1-red)',
+                color: 'white',
+                fontSize: '0.65rem', fontWeight: 900,
+                padding: '3px 10px', borderRadius: 3,
+                letterSpacing: '0.14em',
+                animation: (!demo && !data.raceFinished) ? 'pulse 1.5s ease-in-out infinite' : 'none',
+                flexShrink: 0,
+              }}>
+                {demo ? '🎮 SIMULAÇÃO' : data.raceFinished ? '🏁 FINALIZADA' : '🔴 AO VIVO'}
               </span>
-            )}
+              {!data.raceFinished && (
+                <span className="text-xs" style={{ color: 'var(--f1-muted)' }}>
+                  att. {secondsAgo}s atrás · próx. {Math.max(0, Math.round((POLL_INTERVAL / 1000) - secondsAgo))}s
+                </span>
+              )}
+            </div>
+            <Link
+              href="/dashboard"
+              className="flex-shrink-0 text-xs font-black uppercase px-4 py-2 rounded"
+              style={{ border: '1px solid var(--f1-border-light)', color: 'white', letterSpacing: '0.12em', background: 'rgba(255,255,255,0.03)' }}
+            >
+              ← Voltar
+            </Link>
           </div>
-          <Link href="/dashboard" className="btn-secondary text-xs px-3 py-1.5 flex-shrink-0">← Voltar</Link>
-        </div>
-        <div>
-          <h1 className="text-lg font-black text-white leading-tight">{data.raceName}</h1>
-          <div className="flex items-center gap-3 mt-0.5 flex-wrap">
+          <h1 className="text-2xl sm:text-3xl font-black text-white leading-tight mb-1.5">{data.raceName}</h1>
+          <div className="flex items-center gap-3 flex-wrap">
             {data.randomPosition && (
-              <span className="text-xs font-bold" style={{ color: 'var(--f1-gold)' }}>
-                🎲 Posição aleatória: P{data.randomPosition}
+              <span
+                className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold"
+                style={{ border: '1px solid rgba(232,0,45,0.45)', background: 'rgba(232,0,45,0.1)', color: 'var(--f1-red)' }}
+              >
+                🎲 Posição aleatória: <strong className="font-black">P{data.randomPosition}</strong>
               </span>
             )}
             {data.challengeQuestion && (
@@ -424,6 +450,6 @@ export default function AoVivoPage() {
           </div>
         </>
       )}
-    </main>
+    </div>
   )
 }

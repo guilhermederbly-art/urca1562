@@ -1,3 +1,5 @@
+import PageHero from '@/components/PageHero'
+
 export const revalidate = 300
 
 export const metadata = { title: 'Campeonato F1 2026 — F1 Bolão' }
@@ -63,18 +65,21 @@ export default async function CampeonatoPage() {
 
   return (
     <div>
-      <div className="mb-8 flex items-end justify-between">
-        <div>
-          <p className="text-xs font-bold uppercase tracking-widest mb-1" style={{ color: 'var(--f1-red)' }}>
-            Temporada 2026
-          </p>
-          <h1 className="f1-heading text-3xl">Campeonato</h1>
-        </div>
-        <div className="text-right text-xs" style={{ color: 'var(--f1-muted)' }}>
-          <span>Após rodada </span>
-          <span className="font-bold text-white">{round}</span>
-        </div>
-      </div>
+      <PageHero
+        title="Campeonato"
+        subtitle="Classificação real da Fórmula 1"
+        right={
+          <div
+            className="text-center px-6 py-4 rounded"
+            style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--f1-border)' }}
+          >
+            <div className="text-xs font-bold uppercase tracking-widest mb-1" style={{ color: 'var(--f1-muted)', letterSpacing: '0.15em' }}>
+              Após rodada
+            </div>
+            <div className="font-black text-3xl leading-none text-white">{round}</div>
+          </div>
+        }
+      />
 
       {/* Driver standings */}
       <div className="card overflow-hidden mb-5">

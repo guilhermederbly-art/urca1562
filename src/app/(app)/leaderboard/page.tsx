@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import LeaderboardClient from '@/components/LeaderboardClient'
+import PageHero from '@/components/PageHero'
 
 export const metadata = { title: 'Ranking — F1 Bolão' }
 
@@ -86,12 +87,7 @@ export default async function LeaderboardPage() {
 
   return (
     <div>
-      <div className="mb-6">
-        <p className="text-xs font-bold uppercase tracking-widest mb-1" style={{ color: 'var(--f1-red)' }}>
-          Temporada 2026
-        </p>
-        <h1 className="f1-heading text-3xl">Ranking</h1>
-      </div>
+      <PageHero title="Ranking" subtitle="Classificação geral do bolão" />
 
       {/* Stats */}
       {finishedCount > 0 && (

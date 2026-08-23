@@ -1,17 +1,13 @@
+import PageHero from '@/components/PageHero'
+
 export const metadata = { title: 'Regras — F1 Bolão' }
 
 export default function RegrasPage() {
   return (
-    <div className="max-w-2xl mx-auto">
-      {/* Header */}
-      <div className="mb-8">
-        <p className="text-xs font-bold uppercase tracking-widest mb-1" style={{ color: 'var(--f1-red)' }}>
-          F1 Bolão 2026
-        </p>
-        <h1 className="f1-heading text-3xl">Regras do Bolão</h1>
-      </div>
+    <div>
+      <PageHero kicker="F1 Bolão 2026" title="Regras do Bolão" subtitle="Como funciona a pontuação e o jogo" />
 
-      <div className="flex flex-col gap-5">
+      <div className="max-w-2xl mx-auto flex flex-col gap-5">
 
         {/* Como funciona */}
         <section className="card overflow-hidden">

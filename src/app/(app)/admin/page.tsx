@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import AdminPanel from '@/components/AdminPanel'
+import PageHero from '@/components/PageHero'
 import { ADMIN_EMAIL } from '@/lib/config'
 
 export default async function AdminPage() {
@@ -52,12 +53,11 @@ export default async function AdminPage() {
 
   return (
     <div>
-      <div className="mb-8">
-        <h1 className="text-2xl font-black text-white mb-1">Painel Admin</h1>
-        <p style={{ color: 'var(--f1-muted)' }} className="text-sm">
-          Gerencie corridas, palpites, resultados e usuários
-        </p>
-      </div>
+      <PageHero
+        kicker="Administração"
+        title="Painel Admin"
+        subtitle="Gerencie corridas, palpites, resultados e usuários"
+      />
       <AdminPanel
         races={races ?? []}
         drivers={drivers ?? []}

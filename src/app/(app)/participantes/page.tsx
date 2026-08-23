@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import ParticipantesClient from '@/components/ParticipantesClient'
+import PageHero from '@/components/PageHero'
 
 export default async function ParticipantesPage() {
   const supabase = await createClient()
@@ -48,15 +49,10 @@ export default async function ParticipantesPage() {
 
   return (
     <div>
-      <div className="mb-8">
-        <p className="text-xs font-bold uppercase tracking-widest mb-1" style={{ color: 'var(--f1-red)' }}>
-          Temporada 2026
-        </p>
-        <h1 className="f1-heading text-3xl">Participantes</h1>
-        <p className="text-sm mt-1" style={{ color: 'var(--f1-muted)' }}>
-          {list.length} piloto{list.length !== 1 ? 's' : ''} no grid
-        </p>
-      </div>
+      <PageHero
+        title="Participantes"
+        subtitle={`${list.length} piloto${list.length !== 1 ? 's' : ''} no grid`}
+      />
 
       <ParticipantesClient list={list} openRaceName={openRace?.name ?? null} />
     </div>
