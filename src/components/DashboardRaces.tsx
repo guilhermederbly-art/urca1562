@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useSyncExternalStore } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { format } from 'date-fns'
@@ -30,35 +30,42 @@ interface PredictionRow {
   challenge_answer: string
 }
 
-function useCountdown(target: string) {
-  const [now, setNow] = useState(Date.now())
-  useEffect(() => {
-    const id = setInterval(() => setNow(Date.now()), 1000)
-    return () => clearInterval(id)
-  }, [])
-  const ms = new Date(target).getTime() - now
-  return ms > 0 ? ms : 0
-}
-
-function CountdownTimer({ target }: { target: string }) {
-  const ms = useCountdown(target)
-  if (ms === 0) return null
+// Contagem regressiva em chips [11d][16h][01m] — só renderiza no cliente,
+// evitando mismatch de hidratação e Date.now() durante o render
+function CountdownChips({ target }: { target: string }) {
+  // Relógio de 1s via useSyncExternalStore: no servidor devolve null (não
+  // renderiza, evitando mismatch de hidratação) e no cliente assina o interval
+  const nowSec = useSyncExternalStore<number | null>(
+    cb => { const id = setInterval(cb, 1000); return () => clearInterval(id) },
+    () => Math.floor(Date.now() / 1000),
+    () => null,
+  )
+  if (nowSec === null) return null
+  const ms = new Date(target).getTime() - nowSec * 1000
+  if (ms <= 0) return null
   const totalSec = Math.floor(ms / 1000)
   const days  = Math.floor(totalSec / 86400)
   const hours = Math.floor((totalSec % 86400) / 3600)
   const mins  = Math.floor((totalSec % 3600) / 60)
   const secs  = totalSec % 60
   const pad   = (n: number) => String(n).padStart(2, '0')
-  const color   = totalSec < 7200 ? '#e8002d' : totalSec < 86400 ? '#ffc000' : '#d4d4d4'
-  const compound = totalSec < 7200 ? 'SOFT' : totalSec < 86400 ? 'MEDIUM' : 'HARD'
+  const chips = days > 0
+    ? [`${days}d`, `${pad(hours)}h`, `${pad(mins)}m`]
+    : [`${pad(hours)}h`, `${pad(mins)}m`, `${pad(secs)}s`]
   return (
-    <div className="mt-1.5">
-      <div style={{ fontSize: '0.58rem', fontWeight: 800, letterSpacing: '0.1em', color: 'var(--f1-muted)', textTransform: 'uppercase', marginBottom: '1px' }}>
-        Fecha em <span style={{ color }}>● {compound}</span>
-      </div>
-      <div style={{ fontWeight: 900, fontSize: '1.1rem', color, fontVariantNumeric: 'tabular-nums', lineHeight: 1 }}>
-        {days > 0 ? `${days}d ${pad(hours)}h ${pad(mins)}m` : `${pad(hours)}h ${pad(mins)}m ${pad(secs)}s`}
-      </div>
+    <div className="flex items-center gap-2 mt-3 flex-wrap">
+      <span className="text-xs font-black uppercase" style={{ color: 'var(--f1-muted)', letterSpacing: '0.15em' }}>
+        Fecha em
+      </span>
+      {chips.map((c, i) => (
+        <span
+          key={i}
+          className="text-sm font-black text-white px-2.5 py-1 rounded"
+          style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid var(--f1-border)', fontVariantNumeric: 'tabular-nums' }}
+        >
+          {c}
+        </span>
+      ))}
     </div>
   )
 }
@@ -318,126 +325,94 @@ function CircuitDetailsModal({ race, onClose }: { race: Race; onClose: () => voi
   )
 }
 
-// ── Linha de corrida ──────────────────────────────────────────────────────────
+// ── Linha de corrida (timeline) ───────────────────────────────────────────────
 function RaceRow({
   race,
-  predicted,
   isPast,
-  isAdmin,
   onViewPredictions,
   onViewDetails,
 }: {
   race: Race
-  predicted: boolean
   isPast?: boolean
-  isAdmin?: boolean
   onViewPredictions: (race: Race) => void
   onViewDetails: (race: Race) => void
 }) {
-  const isOpen = race.status === 'open'
-  const isClosed = race.status === 'closed' || race.status === 'finished' || isPast
   const status = isPast
     ? { label: 'Finalizada', color: '#8a8aa0', bg: 'rgba(138,138,160,0.1)' }
     : STATUS_CONFIG[race.status]
 
   return (
-    <div
-      className="card flex items-center gap-0 transition-colors"
-      style={{ borderLeft: isOpen ? '3px solid var(--f1-red)' : '3px solid transparent' }}
-    >
-      <div
-        className="flex-shrink-0 flex items-center justify-center w-14 self-stretch"
+    <div className="relative">
+      {/* Ponto do trilho da timeline */}
+      <span
+        aria-hidden
+        className="hidden sm:block absolute rounded-full"
         style={{
-          backgroundColor: isOpen ? 'rgba(232,0,45,0.08)' : 'rgba(0,0,0,0.2)',
-          borderRight: '1px solid var(--f1-border)',
+          width: '9px', height: '9px', left: '-27px', top: '50%', transform: 'translateY(-50%)',
+          background: '#3a3a50', boxShadow: '0 0 0 3px var(--f1-dark)',
         }}
-      >
-        <span className="round-badge">{race.round_number}</span>
-      </div>
+      />
 
-      <div className="flex-1 min-w-0 px-4 py-3">
-        <div className="mb-0.5">
-          <span className="font-bold text-white" style={{ fontSize: '0.9375rem' }}>
-            {getRaceFlag(race.name, race.circuit)} {race.name}
-          </span>
-          {' '}
-          <span className="status-pill inline-flex" style={{ color: status.color, backgroundColor: status.bg }}>
-            {status.label}
-          </span>
+      <div className="card flex items-stretch overflow-hidden">
+        <div
+          className="flex-shrink-0 flex items-center justify-center w-16"
+          style={{ background: 'rgba(0,0,0,0.25)', borderRight: '1px solid var(--f1-border)' }}
+        >
+          <span className="round-badge" style={{ fontSize: '1.5rem' }}>{race.round_number}</span>
         </div>
-        <div className="flex items-center gap-2 flex-wrap">
-          <span className="text-xs" style={{ color: 'var(--f1-muted)' }}>{race.circuit}</span>
-          <span style={{ color: 'var(--f1-border-light)' }}>·</span>
-          <span className="text-xs" style={{ color: 'var(--f1-muted)' }}>
-            {format(new Date(race.race_start_time), 'dd MMM yyyy', { locale: ptBR })}
-          </span>
-          {race.random_position && isOpen && (
+
+        <div className="flex-1 min-w-0 px-4 py-3.5">
+          <div className="flex items-center gap-2 flex-wrap mb-1">
+            <span className="font-bold text-white" style={{ fontSize: '0.9375rem' }}>
+              {getRaceFlag(race.name, race.circuit)} {race.name}
+            </span>
+            <span className="status-pill inline-flex" style={{ color: status.color, backgroundColor: status.bg, border: `1px solid ${status.color}33` }}>
+              {status.label}
+            </span>
+          </div>
+          <div className="flex items-center gap-2 flex-wrap text-xs" style={{ color: 'var(--f1-muted)' }}>
+            <span>{race.circuit}</span>
+            <span style={{ color: 'var(--f1-border-light)' }}>•</span>
+            <span>{format(new Date(race.race_start_time), "dd 'de' MMMM", { locale: ptBR })}</span>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 flex-shrink-0 pr-4">
+          {race.status === 'closed' && !isPast && (
             <>
-              <span style={{ color: 'var(--f1-border-light)' }}>·</span>
-              <span className="text-xs font-bold" style={{ color: 'var(--f1-gold)' }}>
-                🎲 P{race.random_position}
-              </span>
+              <Link
+                href={`/ao-vivo/${race.id}`}
+                className="hidden sm:inline-flex text-xs font-black uppercase tracking-widest px-3 py-2 rounded"
+                style={{ border: '1px solid rgba(232,0,45,0.5)', color: 'var(--f1-red)' }}
+              >
+                🔴 Ao vivo
+              </Link>
+              <button
+                onClick={() => onViewPredictions(race)}
+                className="hidden sm:inline-flex text-xs font-black uppercase tracking-widest px-3 py-2 rounded"
+                style={{ border: '1px solid var(--f1-border-light)', color: 'var(--f1-muted)' }}
+              >
+                👁 Palpites
+              </button>
             </>
           )}
-        </div>
-      </div>
-
-      <div className="flex items-center gap-2 flex-shrink-0 pr-3 py-3">
-        {/* Botão detalhes */}
-        <button
-          onClick={() => onViewDetails(race)}
-          className="text-xs font-bold px-3 py-1.5 rounded border"
-          style={{ borderColor: 'var(--f1-border)', color: 'var(--f1-muted)' }}
-        >
-          Detalhes
-        </button>
-
-        {/* Botão ao vivo — apenas corrida fechada */}
-        {race.status === 'closed' && (
-          <Link
-            href={`/ao-vivo/${race.id}`}
-            className="text-xs font-bold px-3 py-1.5 rounded border"
-            style={{ borderColor: 'var(--f1-red)', color: 'var(--f1-red)' }}
-          >
-            🔴 Ao vivo
-          </Link>
-        )}
-
-
-        {/* Botão ver palpites — apenas quando fechado (não quando finalizado) */}
-        {race.status === 'closed' && (
+          {(race.status === 'finished' || isPast) && (
+            <Link
+              href={`/races/${race.id}`}
+              className="hidden sm:inline-flex text-xs font-black uppercase tracking-widest px-3 py-2 rounded"
+              style={{ border: '1px solid rgba(255,192,0,0.4)', color: 'var(--f1-gold)' }}
+            >
+              Resultado
+            </Link>
+          )}
           <button
-            onClick={() => onViewPredictions(race)}
-            className="text-xs font-bold px-3 py-1.5 rounded border"
-            style={{ borderColor: 'var(--f1-border)', color: 'var(--f1-muted)' }}
+            onClick={() => onViewDetails(race)}
+            className="text-xs font-black uppercase tracking-widest px-4 py-2 rounded"
+            style={{ border: '1px solid var(--f1-border-light)', color: 'white', background: 'rgba(255,255,255,0.03)' }}
           >
-            👁 Ver palpites
+            Detalhes
           </button>
-        )}
-
-        {isOpen && !predicted && (
-          <Link href={`/races/${race.id}`} className="btn-primary" style={{ fontSize: '0.75rem', padding: '0.4rem 1rem' }}>
-            Palpitar
-          </Link>
-        )}
-        {isOpen && predicted && (
-          <Link href={`/races/${race.id}`} className="btn-secondary" style={{ fontSize: '0.75rem', padding: '0.4rem 1rem' }}>
-            Editar
-          </Link>
-        )}
-        {!isOpen && (race.status === 'finished') && (
-          <Link href={`/races/${race.id}`} className="btn-secondary" style={{ fontSize: '0.75rem', padding: '0.4rem 1rem' }}>
-            Resultado
-          </Link>
-        )}
-        {!isOpen && !isClosed && predicted && (
-          <span className="text-xs font-bold uppercase tracking-wider px-3" style={{ color: '#00d2be' }}>
-            ✓ Enviado
-          </span>
-        )}
-        {!isOpen && !isClosed && !predicted && race.status !== 'upcoming' && (
-          <span className="text-xs font-bold uppercase tracking-wider px-3" style={{ color: 'var(--f1-muted)' }}>—</span>
-        )}
+        </div>
       </div>
     </div>
   )
@@ -466,8 +441,18 @@ export default function DashboardRaces({ openRace, liveRace, recentlyFinishedRac
     return () => clearTimeout(timer)
   }, [activeRaces, router])
 
+  const [syncing, setSyncing] = useState(false)
+  async function syncCalendar() {
+    setSyncing(true)
+    try { await fetch('/api/races/import-calendar', { method: 'POST' }) } catch {}
+    setSyncing(false)
+    router.refresh()
+  }
+
+  const featuredRace = openRace ?? null
+
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-5">
 
       {modalRace && (
         <PredictionsModal race={modalRace} onClose={() => setModalRace(null)} />
@@ -479,56 +464,57 @@ export default function DashboardRaces({ openRace, liveRace, recentlyFinishedRac
       {/* ── Corrida ao vivo (destaque) ───────────────────────── */}
       {liveRace && (
         <div
-          className="card overflow-hidden"
+          className="rounded overflow-hidden p-5"
           style={{
+            border: '1px solid rgba(232,0,45,0.6)',
             borderLeft: '4px solid var(--f1-red)',
-            background: 'linear-gradient(135deg, rgba(232,0,45,0.15) 0%, rgba(13,13,20,0) 60%)',
+            background: 'linear-gradient(135deg, rgba(232,0,45,0.14) 0%, var(--f1-card) 60%)',
           }}
         >
-          <div className="flex items-center gap-2 px-5 pt-4 pb-0">
-            <span
-              className="text-xs font-black uppercase tracking-widest px-2 py-0.5 rounded"
-              style={{ background: 'var(--f1-red)', color: 'white', letterSpacing: '0.12em', animation: 'pulse 1.5s ease-in-out infinite' }}
-            >
-              🔴 Ao vivo agora
-            </span>
-          </div>
+          <span
+            className="inline-flex text-xs font-black uppercase tracking-widest px-2.5 py-1 rounded mb-4"
+            style={{ background: 'var(--f1-red)', color: 'white', letterSpacing: '0.14em', animation: 'pulse 1.5s ease-in-out infinite' }}
+          >
+            🔴 Ao vivo agora
+          </span>
 
-          <div className="flex flex-col sm:flex-row sm:items-center gap-3 p-4 pt-3">
-            <div className="flex items-center gap-3 flex-1 min-w-0">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+            <div className="flex items-center gap-4 flex-1 min-w-0">
               <div
-                className="flex-shrink-0 flex flex-col items-center justify-center w-12 h-12 rounded"
-                style={{ background: 'rgba(232,0,45,0.15)', border: '1px solid rgba(232,0,45,0.3)' }}
+                className="flex-shrink-0 flex flex-col items-center justify-center w-14 h-14 rounded"
+                style={{ background: 'rgba(232,0,45,0.15)', border: '1px solid rgba(232,0,45,0.35)' }}
               >
                 <span className="text-xs font-bold uppercase" style={{ color: 'var(--f1-red)', letterSpacing: '0.1em' }}>R</span>
                 <span className="text-xl font-black text-white leading-none">{liveRace.round_number}</span>
               </div>
               <div className="flex-1 min-w-0">
-                <div className="font-black text-white text-base leading-tight">{getRaceFlag(liveRace.name, liveRace.circuit)} {liveRace.name}</div>
-                <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-0.5">
-                  <span className="text-xs" style={{ color: 'var(--f1-muted)' }}>{liveRace.circuit}</span>
+                <div className="font-black text-white text-base leading-tight">
+                  {getRaceFlag(liveRace.name, liveRace.circuit)} {liveRace.name}
+                </div>
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-1 text-xs" style={{ color: 'var(--f1-muted)' }}>
+                  <span>{liveRace.circuit}</span>
                   {liveRace.random_position && (
                     <>
-                      <span style={{ color: 'var(--f1-border-light)' }}>·</span>
-                      <span className="text-xs font-bold" style={{ color: 'var(--f1-gold)' }}>🎲 P{liveRace.random_position}</span>
+                      <span style={{ color: 'var(--f1-border-light)' }}>•</span>
+                      <span className="font-bold" style={{ color: 'var(--f1-gold)' }}>🎲 P{liveRace.random_position}</span>
                     </>
                   )}
                 </div>
               </div>
             </div>
 
-            <div className="flex items-center sm:flex-col sm:items-end gap-2 flex-shrink-0">
+            <div className="flex flex-col gap-2 flex-shrink-0 w-full sm:w-auto">
               <Link
                 href={`/ao-vivo/${liveRace.id}`}
-                className="btn-primary"
-                style={{ fontSize: '0.875rem', padding: '0.6rem 1.5rem', fontWeight: 900, background: 'var(--f1-red)' }}
+                className="btn-primary justify-center"
+                style={{ fontSize: '0.875rem', padding: '0.65rem 1.75rem', fontWeight: 900 }}
               >
                 🔴 Acompanhar ao vivo
               </Link>
               <button
                 onClick={() => setModalRace(liveRace)}
-                className="text-xs font-bold px-3 py-1.5 rounded border"
-                style={{ borderColor: 'var(--f1-border)', color: 'var(--f1-muted)' }}
+                className="text-xs font-black uppercase tracking-widest px-3 py-2 rounded"
+                style={{ border: '1px solid var(--f1-border-light)', color: 'var(--f1-muted)' }}
               >
                 👁 Ver palpites
               </button>
@@ -537,135 +523,135 @@ export default function DashboardRaces({ openRace, liveRace, recentlyFinishedRac
         </div>
       )}
 
-      {/* ── Última corrida encerrada ────────────────────────── */}
+      {/* ── Última corrida ───────────────────────────────────── */}
       {recentlyFinishedRace && !liveRace && (
         <div
-          className="card overflow-hidden"
-          style={{ borderLeft: '4px solid var(--f1-gold)' }}
+          className="rounded overflow-hidden p-5"
+          style={{
+            border: '1px solid rgba(255,192,0,0.4)',
+            borderLeft: '4px solid var(--f1-gold)',
+            background: 'var(--f1-card)',
+          }}
         >
-          <div className="flex items-center gap-2 px-5 pt-4 pb-0">
-            <span
-              className="text-xs font-black uppercase tracking-widest px-2 py-0.5 rounded"
-              style={{ background: 'rgba(255,192,0,0.15)', color: 'var(--f1-gold)', border: '1px solid rgba(255,192,0,0.3)', letterSpacing: '0.12em' }}
-            >
-              🏆 Última corrida
-            </span>
-          </div>
+          <span
+            className="inline-flex items-center gap-1.5 text-xs font-black uppercase tracking-widest px-2.5 py-1 rounded mb-4"
+            style={{ background: 'rgba(255,192,0,0.12)', color: 'var(--f1-gold)', border: '1px solid rgba(255,192,0,0.35)', letterSpacing: '0.14em' }}
+          >
+            🏆 Última corrida
+          </span>
 
-          <div className="flex flex-col sm:flex-row sm:items-center gap-3 p-4 pt-3">
-            <div className="flex items-center gap-3 flex-1 min-w-0">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+            <div className="flex items-center gap-4 flex-1 min-w-0">
               <div
-                className="flex-shrink-0 flex flex-col items-center justify-center w-12 h-12 rounded"
-                style={{ background: 'rgba(255,192,0,0.1)', border: '1px solid rgba(255,192,0,0.25)' }}
+                className="flex-shrink-0 flex flex-col items-center justify-center w-14 h-14 rounded"
+                style={{ background: 'rgba(255,192,0,0.08)', border: '1px solid rgba(255,192,0,0.3)' }}
               >
                 <span className="text-xs font-bold uppercase" style={{ color: 'var(--f1-gold)', letterSpacing: '0.1em' }}>R</span>
                 <span className="text-xl font-black text-white leading-none">{recentlyFinishedRace.round_number}</span>
               </div>
               <div className="flex-1 min-w-0">
-                <div className="font-black text-white text-base leading-tight">{getRaceFlag(recentlyFinishedRace.name, recentlyFinishedRace.circuit)} {recentlyFinishedRace.name}</div>
-                <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-0.5">
-                  <span className="text-xs" style={{ color: 'var(--f1-muted)' }}>{recentlyFinishedRace.circuit}</span>
-                  <span style={{ color: 'var(--f1-border-light)' }}>·</span>
-                  <span className="text-xs" style={{ color: 'var(--f1-muted)' }}>
-                    {format(new Date(recentlyFinishedRace.race_start_time), "dd 'de' MMMM", { locale: ptBR })}
-                  </span>
+                <div className="font-black text-white text-base leading-tight">
+                  {getRaceFlag(recentlyFinishedRace.name, recentlyFinishedRace.circuit)} {recentlyFinishedRace.name}
+                </div>
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-1 text-xs" style={{ color: 'var(--f1-muted)' }}>
+                  <span>{recentlyFinishedRace.circuit}</span>
+                  <span style={{ color: 'var(--f1-border-light)' }}>•</span>
+                  <span>{format(new Date(recentlyFinishedRace.race_start_time), "dd 'de' MMMM", { locale: ptBR })}</span>
                 </div>
               </div>
             </div>
 
-            <div className="flex items-center sm:flex-col sm:items-end gap-2 flex-shrink-0">
-              <Link
-                href={`/races/${recentlyFinishedRace.id}`}
-                className="btn-primary"
-                style={{ fontSize: '0.875rem', padding: '0.6rem 1.5rem', fontWeight: 900, background: 'var(--f1-gold)', color: '#000' }}
-              >
-                🏆 Ver pontuação
-              </Link>
-            </div>
+            <Link
+              href={`/races/${recentlyFinishedRace.id}`}
+              className="flex-shrink-0 inline-flex items-center justify-center gap-2 text-xs font-black uppercase tracking-widest px-5 py-3 rounded w-full sm:w-auto"
+              style={{ border: '1px solid rgba(255,192,0,0.5)', color: 'var(--f1-gold)', background: 'rgba(255,192,0,0.06)', letterSpacing: '0.12em' }}
+            >
+              🏆 Ver pontuação
+            </Link>
           </div>
         </div>
       )}
 
-      {/* ── Corrida em destaque (aberta) ────────────────────── */}
-      {openRace && (
+      {/* ── Próxima corrida (palpite aberto) ─────────────────── */}
+      {featuredRace && (
         <div
-          className="card overflow-hidden"
+          className="rounded overflow-hidden p-5"
           style={{
+            border: '1px solid rgba(232,0,45,0.55)',
             borderLeft: '4px solid var(--f1-red)',
-            background: 'linear-gradient(135deg, rgba(232,0,45,0.12) 0%, rgba(13,13,20,0) 60%)',
+            background: 'linear-gradient(135deg, rgba(232,0,45,0.1) 0%, var(--f1-card) 55%)',
           }}
         >
-          <div className="flex items-center gap-2 px-5 pt-4 pb-0">
-            <span
-              className="text-xs font-black uppercase tracking-widest px-2 py-0.5 rounded"
-              style={{ background: 'var(--f1-red)', color: 'white', letterSpacing: '0.12em' }}
-            >
-              🏁 Palpite aberto
-            </span>
-          </div>
+          <span
+            className="inline-flex text-xs font-black uppercase tracking-widest px-2.5 py-1 rounded mb-4"
+            style={{ border: '1px solid rgba(232,0,45,0.6)', color: 'var(--f1-red)', background: 'rgba(232,0,45,0.08)', letterSpacing: '0.14em' }}
+          >
+            Próxima corrida
+          </span>
 
-          <div className="flex flex-col sm:flex-row sm:items-center gap-3 p-4 pt-3">
-            <div className="flex items-center gap-3 flex-1 min-w-0">
+          <div className="flex flex-col sm:flex-row gap-4">
+            <div className="flex items-start gap-4 flex-1 min-w-0">
               <div
-                className="flex-shrink-0 flex flex-col items-center justify-center w-12 h-12 rounded"
-                style={{ background: 'rgba(232,0,45,0.15)', border: '1px solid rgba(232,0,45,0.3)' }}
+                className="flex-shrink-0 flex flex-col items-center justify-center w-14 h-14 rounded"
+                style={{ background: 'rgba(232,0,45,0.12)', border: '1px solid rgba(232,0,45,0.35)' }}
               >
                 <span className="text-xs font-bold uppercase" style={{ color: 'var(--f1-red)', letterSpacing: '0.1em' }}>R</span>
-                <span className="text-xl font-black text-white leading-none">{openRace.round_number}</span>
+                <span className="text-xl font-black text-white leading-none">{featuredRace.round_number}</span>
               </div>
 
               <div className="flex-1 min-w-0">
-                <div className="font-black text-white text-base leading-tight">{getRaceFlag(openRace.name, openRace.circuit)} {openRace.name}</div>
-                <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-0.5">
-                  <span className="text-xs" style={{ color: 'var(--f1-muted)' }}>{openRace.circuit}</span>
-                  <span style={{ color: 'var(--f1-border-light)' }}>·</span>
-                  <span className="text-xs" style={{ color: 'var(--f1-muted)' }}>
-                    {format(new Date(openRace.race_start_time), "dd 'de' MMMM", { locale: ptBR })}
-                  </span>
-                  {openRace.random_position && (
-                    <span className="text-xs font-bold" style={{ color: 'var(--f1-gold)' }}>
-                      · 🎲 P{openRace.random_position}
-                    </span>
+                <div className="font-black text-white text-base leading-tight">
+                  {getRaceFlag(featuredRace.name, featuredRace.circuit)} {featuredRace.name}
+                </div>
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-1 text-xs" style={{ color: 'var(--f1-muted)' }}>
+                  <span>{featuredRace.circuit}</span>
+                  <span style={{ color: 'var(--f1-border-light)' }}>•</span>
+                  <span>{format(new Date(featuredRace.race_start_time), "d 'de' MMMM", { locale: ptBR })}</span>
+                  {featuredRace.random_position && (
+                    <>
+                      <span style={{ color: 'var(--f1-border-light)' }}>•</span>
+                      <span className="font-bold" style={{ color: 'var(--f1-gold)' }}>🎲 P{featuredRace.random_position}</span>
+                    </>
                   )}
                 </div>
-                <CountdownTimer target={openRace.fp1_start_time ?? openRace.qualifying_start_time} />
+                <CountdownChips target={featuredRace.fp1_start_time ?? featuredRace.qualifying_start_time} />
               </div>
             </div>
 
-            <div className="flex items-center sm:flex-col sm:items-end gap-2 flex-shrink-0">
-              {!predicted(openRace.id) ? (
+            <div className="flex flex-col gap-2 flex-shrink-0 w-full sm:w-52">
+              {!predicted(featuredRace.id) ? (
                 <Link
-                  href={`/races/${openRace.id}`}
-                  className="btn-primary"
-                  style={{ fontSize: '0.875rem', padding: '0.6rem 1.5rem', fontWeight: 900 }}
+                  href={`/races/${featuredRace.id}`}
+                  className="btn-primary justify-center"
+                  style={{ fontSize: '0.875rem', padding: '0.7rem 1.5rem', fontWeight: 900 }}
                 >
-                  Palpitar
+                  Fazer palpite
                 </Link>
               ) : (
-                <div className="text-center">
-                  <div className="text-xs font-black uppercase tracking-wider mb-1" style={{ color: '#00d2be' }}>
+                <>
+                  <div className="text-center text-xs font-black uppercase tracking-wider" style={{ color: '#00d2be' }}>
                     ✓ Palpite enviado
                   </div>
                   <Link
-                    href={`/races/${openRace.id}`}
-                    className="btn-secondary"
-                    style={{ fontSize: '0.75rem', padding: '0.35rem 0.875rem' }}
+                    href={`/races/${featuredRace.id}`}
+                    className="btn-primary justify-center"
+                    style={{ fontSize: '0.875rem', padding: '0.7rem 1.5rem', fontWeight: 900 }}
                   >
-                    Editar
+                    Editar palpite
                   </Link>
-                </div>
+                </>
               )}
               <Link
-                href={`/ao-vivo/${openRace.id}`}
-                className="text-xs font-bold px-3 py-1.5 rounded border"
-                style={{ borderColor: '#22c55e', color: '#22c55e' }}
+                href={`/ao-vivo/${featuredRace.id}`}
+                className="inline-flex items-center justify-center gap-2 text-xs font-black uppercase tracking-widest px-3 py-2.5 rounded"
+                style={{ border: '1px solid rgba(34,197,94,0.5)', color: '#22c55e', letterSpacing: '0.12em' }}
               >
-                📡 Ao Vivo
+                📡 Ao vivo
               </Link>
-<button
-                onClick={() => setDetailsRace(openRace)}
-                className="text-xs font-bold px-3 py-1.5 rounded border"
-                style={{ borderColor: 'var(--f1-border)', color: 'var(--f1-muted)' }}
+              <button
+                onClick={() => setDetailsRace(featuredRace)}
+                className="text-xs font-black uppercase tracking-widest px-3 py-2.5 rounded"
+                style={{ border: '1px solid var(--f1-border-light)', color: 'white', background: 'rgba(255,255,255,0.03)', letterSpacing: '0.12em' }}
               >
                 Detalhes
               </button>
@@ -674,11 +660,16 @@ export default function DashboardRaces({ openRace, liveRace, recentlyFinishedRac
         </div>
       )}
 
-      {/* ── Próximas corridas ────────────────────────────────── */}
+      {/* ── Próximas corridas (timeline) ─────────────────────── */}
       {activeRaces.length > 0 && (
-        <div className="flex flex-col gap-2">
+        <div className="relative flex flex-col gap-3 sm:pl-7 mt-1">
+          <span
+            aria-hidden
+            className="hidden sm:block absolute top-2 bottom-2 pointer-events-none"
+            style={{ left: '4px', width: '1px', background: 'var(--f1-border)' }}
+          />
           {activeRaces.map(race => (
-            <RaceRow key={race.id} race={race} predicted={predicted(race.id)} isAdmin={isAdmin} onViewPredictions={setModalRace} onViewDetails={setDetailsRace} />
+            <RaceRow key={race.id} race={race} onViewPredictions={setModalRace} onViewDetails={setDetailsRace} />
           ))}
         </div>
       )}
@@ -695,14 +686,46 @@ export default function DashboardRaces({ openRace, liveRace, recentlyFinishedRac
             {showPast ? 'Ocultar' : `Ver ${finishedRaces.length} corrida${finishedRaces.length > 1 ? 's' : ''} anterior${finishedRaces.length > 1 ? 'es' : ''}`}
           </button>
           {showPast && (
-            <div className="flex flex-col gap-2 mt-2">
+            <div className="relative flex flex-col gap-3 sm:pl-7 mt-2">
+              <span
+                aria-hidden
+                className="hidden sm:block absolute top-2 bottom-2 pointer-events-none"
+                style={{ left: '4px', width: '1px', background: 'var(--f1-border)' }}
+              />
               {finishedRaces.map(race => (
-                <RaceRow key={race.id} race={race} predicted={predicted(race.id)} isPast isAdmin={isAdmin} onViewPredictions={setModalRace} onViewDetails={setDetailsRace} />
+                <RaceRow key={race.id} race={race} isPast onViewPredictions={setModalRace} onViewDetails={setDetailsRace} />
               ))}
             </div>
           )}
         </div>
       )}
+
+      {/* ── Aviso + sincronizar calendário ───────────────────── */}
+      <div className="card px-5 py-4 flex flex-col sm:flex-row sm:items-center gap-4">
+        <div className="flex items-center gap-4 flex-1 min-w-0">
+          <span
+            className="flex items-center justify-center w-9 h-9 rounded-full flex-shrink-0"
+            style={{ border: '1px solid rgba(232,0,45,0.4)', color: 'var(--f1-red)' }}
+            aria-hidden
+          >
+            🔄
+          </span>
+          <div className="text-sm" style={{ color: 'var(--f1-muted)' }}>
+            <div>As datas podem sofrer alterações.</div>
+            <div>Fique atento às atualizações!</div>
+          </div>
+        </div>
+        {isAdmin && (
+          <button
+            onClick={syncCalendar}
+            disabled={syncing}
+            className="flex-shrink-0 inline-flex items-center justify-center gap-2 text-xs font-black uppercase tracking-widest px-5 py-3 rounded"
+            style={{ border: '1px solid var(--f1-border-light)', color: 'white', background: 'rgba(255,255,255,0.03)', letterSpacing: '0.12em', opacity: syncing ? 0.6 : 1 }}
+          >
+            📅 {syncing ? 'Sincronizando...' : 'Sincronizar calendário'}
+          </button>
+        )}
+      </div>
 
       {!openRace && !liveRace && !recentlyFinishedRace && activeRaces.length === 0 && (
         <div className="card p-16 text-center">

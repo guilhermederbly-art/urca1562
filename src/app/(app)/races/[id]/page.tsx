@@ -2,9 +2,17 @@ import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
-import Link from 'next/link'
 import PredictionForm from '@/components/PredictionForm'
-import RaceResultsView from '@/components/RaceResultsView'
+import RaceHero from '@/components/RaceHero'
+import RaceScheduleBanner from '@/components/RaceScheduleBanner'
+import {
+  ScoreSummaryCard,
+  ChallengeResultCard,
+  ResultsTableCard,
+  CircuitInfoCard,
+  DicaBar,
+  EmptyResultsNotice,
+} from '@/components/RaceResultsView'
 import RaceConsensus, { type RawPrediction } from '@/components/RaceConsensus'
 import RaceScoreboard from '@/components/RaceScoreboard'
 import type { GroupInfo } from '@/components/GroupSelector'
@@ -85,39 +93,14 @@ export default async function RacePage({ params }: { params: Promise<{ id: strin
     }))
   }
 
+  const dateLabel = format(new Date(race.race_start_time), "dd 'de' MMMM 'de' yyyy", { locale: ptBR })
+
   return (
     <div>
-      {/* Header */}
-      <div className="mb-8">
-        <div className="flex items-center justify-between gap-2 text-sm mb-2">
-          <div className="flex items-center gap-2" style={{ color: 'var(--f1-muted)' }}>
-            <span>Corrida</span>
-            <span>·</span>
-            <span>Rodada {race.round_number}</span>
-          </div>
-          <Link href="/dashboard" className="btn-secondary text-xs px-3 py-1.5">← Voltar</Link>
-        </div>
-        <h1 className="text-2xl font-black text-white mb-1">{race.name}</h1>
-        <p style={{ color: 'var(--f1-muted)' }} className="text-sm">
-          {race.circuit} ·{' '}
-          {format(new Date(race.race_start_time), "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}
-        </p>
-        {race.random_position && (
-          <div className="mt-3 inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-semibold"
-            style={{ backgroundColor: 'rgba(232,0,45,0.15)', color: 'var(--f1-red)' }}>
-            🎲 Posição aleatória da rodada: <strong>P{race.random_position}</strong>
-          </div>
-        )}
-      </div>
+      <RaceHero race={race} dateLabel={dateLabel} />
 
       {/* Status banners */}
-      {isOpen && (
-        <div className="mb-6 p-3 rounded border text-sm"
-          style={{ borderColor: '#22c55e', backgroundColor: 'rgba(34,197,94,0.08)', color: '#22c55e' }}>
-          ✅ Palpites abertos até o início do FP1:{' '}
-          <strong>{format(new Date(race.fp1_start_time ?? race.qualifying_start_time), "dd/MM HH:mm", { locale: ptBR })}</strong>
-        </div>
-      )}
+      {isOpen && <RaceScheduleBanner race={race} />}
 
       {!isOpen && !isFinished && (
         <div className="mb-6 p-3 rounded border text-sm"
@@ -136,29 +119,44 @@ export default async function RacePage({ params }: { params: Promise<{ id: strin
         />
       ) : (
         <div className="flex flex-col gap-6">
-          <RaceResultsView
-            race={race}
-            drivers={drivers ?? []}
-            result={result ?? undefined}
-            userPrediction={prediction ?? undefined}
-          />
-          {isFinished && scores.length > 0 && (
-            <RaceScoreboard
-              scores={scores}
-              currentUserId={user!.id}
-              hasChallengePoints={scores.some(s => s.challenge_points > 0)}
-              groups={groups}
-            />
-          )}
-          {allPredictions.length > 0 && !isFinished && (
-            <RaceConsensus
-              race={race}
-              allPredictions={allPredictions}
-              drivers={drivers ?? []}
-              userPrediction={prediction ?? undefined}
-              groups={groups}
-            />
-          )}
+          <div className="flex flex-col gap-6 lg:grid lg:grid-cols-2 lg:items-start">
+            {/* Coluna esquerda: resultado + circuito */}
+            <div className="flex flex-col gap-6 order-2 lg:order-none">
+              <ResultsTableCard
+                race={race}
+                drivers={drivers ?? []}
+                result={result ?? undefined}
+                userPrediction={prediction ?? undefined}
+              />
+              <EmptyResultsNotice result={result ?? undefined} userPrediction={prediction ?? undefined} />
+              <CircuitInfoCard race={race} />
+            </div>
+
+            {/* Coluna direita: pontuação + desafio + ranking da rodada */}
+            <div className="flex flex-col gap-6 order-1 lg:order-none">
+              <ScoreSummaryCard race={race} result={result ?? undefined} userPrediction={prediction ?? undefined} />
+              <ChallengeResultCard race={race} result={result ?? undefined} userPrediction={prediction ?? undefined} />
+              {isFinished && scores.length > 0 && (
+                <RaceScoreboard
+                  scores={scores}
+                  currentUserId={user!.id}
+                  hasChallengePoints={scores.some(s => s.challenge_points > 0)}
+                  groups={groups}
+                />
+              )}
+              {allPredictions.length > 0 && !isFinished && (
+                <RaceConsensus
+                  race={race}
+                  allPredictions={allPredictions}
+                  drivers={drivers ?? []}
+                  userPrediction={prediction ?? undefined}
+                  groups={groups}
+                />
+              )}
+            </div>
+          </div>
+
+          <DicaBar race={race} />
         </div>
       )}
     </div>

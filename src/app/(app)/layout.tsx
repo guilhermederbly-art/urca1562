@@ -22,7 +22,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     <div className="min-h-dvh flex flex-col">
       <Pinger />
       <Navbar username={profile?.username ?? user.email ?? ''} isAdmin={isAdmin} />
-      <main className="flex-1 container mx-auto px-4 py-8 max-w-4xl">
+      <main className="flex-1 container mx-auto px-4 py-8 max-w-6xl">
         {children}
       </main>
     </div>

@@ -29,11 +29,25 @@
   box-sizing: border-box;
 }
 
+/* Os heroes usam full-bleed com 100vw, que no desktop inclui a barra de
+   rolagem; clip no html E no body evita a rolagem horizontal de ~8px que
+   isso causaria (clip só no body não propaga pra viewport no Chrome) */
+html {
+  overflow-x: clip;
+}
+
 body {
   background-color: var(--f1-dark);
   color: var(--f1-text);
   font-family: 'Titillium Web', 'Inter', system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
+  overflow-x: clip;
+}
+
+/* Faixa que escapa do container e ocupa a largura toda da viewport */
+.full-bleed {
+  margin-left: calc(50% - 50vw);
+  margin-right: calc(50% - 50vw);
 }
 
 /* ── Cards ─────────────────────────────────────────────── */

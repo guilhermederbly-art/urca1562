@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import type { Race } from '@/lib/types/database'
 import DashboardRaces from '@/components/DashboardRaces'
+import Link from 'next/link'
 import { ADMIN_EMAIL } from '@/lib/config'
 
 export const metadata = { title: 'Calendário — F1 Bolão' }
@@ -41,58 +42,92 @@ export default async function DashboardPage() {
     r.status !== 'open' && !isPast(r) && r.id !== liveRace?.id
   )
 
-  const rankLabel = userRank === 1 ? '🥇' : userRank === 2 ? '🥈' : userRank === 3 ? '🥉' : `${userRank}º`
+  const finished = races.filter(r => r.status === 'finished').length
+  const total = races.length
+  const pct = total > 0 ? Math.round((finished / total) * 100) : 0
 
   return (
     <div>
-      <div className="mb-8 flex items-end justify-between gap-4">
-        <div>
-          <p className="text-xs font-bold uppercase tracking-widest mb-1" style={{ color: 'var(--f1-red)' }}>
-            Temporada 2026
-          </p>
-          <h1 className="f1-heading text-3xl">Calendário</h1>
-        </div>
-        {userRank !== null && totalPlayers > 1 && (
-          <div
-            className="flex-shrink-0 text-center px-4 py-2 rounded"
-            style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid var(--f1-border)' }}
-          >
-            <div className="text-xs font-bold uppercase tracking-widest mb-0.5" style={{ color: 'var(--f1-muted)' }}>Sua posição</div>
-            <div className="font-black text-2xl leading-none" style={{ color: userRank <= 3 ? 'var(--f1-gold)' : 'white' }}>
-              {rankLabel}
-            </div>
-            <div className="text-xs mt-0.5" style={{ color: 'var(--f1-muted)' }}>{userPoints} pts</div>
-          </div>
-        )}
-      </div>
+      {/* ── Hero ─────────────────────────────────────────────── */}
+      <div
+        className="full-bleed -mt-8 mb-6 relative overflow-hidden"
+        style={{
+          background: 'radial-gradient(ellipse at 25% 0%, #1a1016 0%, #101018 45%, #0d0d14 100%)',
+          borderBottom: '1px solid var(--f1-border)',
+        }}
+      >
+        {/* Listras diagonais no canto superior esquerdo */}
+        <div
+          aria-hidden
+          className="absolute top-0 left-0 pointer-events-none"
+          style={{
+            width: '220px',
+            height: '110px',
+            background: 'repeating-linear-gradient(-60deg, var(--f1-red) 0px, var(--f1-red) 14px, #b00022 14px, #b00022 18px, transparent 18px, transparent 36px)',
+            clipPath: 'polygon(0 0, 100% 0, 0 100%)',
+            opacity: 0.9,
+          }}
+        />
 
-      {/* Season progress */}
-      {races.length > 0 && (() => {
-        const finished = races.filter(r => r.status === 'finished').length
-        const total = races.length
-        const pct = Math.round((finished / total) * 100)
-        return (
-          <div className="mb-6">
-            <div className="flex items-center justify-between mb-1.5">
-              <span className="text-xs font-bold uppercase tracking-widest" style={{ color: 'var(--f1-muted)' }}>
-                Progresso da temporada
-              </span>
-              <span className="text-xs font-black" style={{ color: 'var(--f1-muted)' }}>
-                {finished}/{total} corridas
-              </span>
+        <div className="container mx-auto max-w-6xl px-4 pt-10 pb-8 relative">
+          <div className="flex flex-col sm:flex-row sm:items-start gap-6 sm:gap-4 justify-between">
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-black uppercase tracking-widest mb-1" style={{ color: 'var(--f1-red)', letterSpacing: '0.18em' }}>
+                Temporada 2026
+              </p>
+              <h1 className="f1-heading italic text-4xl sm:text-5xl mb-2">Calendário</h1>
+              <p className="text-sm sm:text-base" style={{ color: 'var(--f1-muted)' }}>
+                Acompanhe todas as corridas e faça seus palpites!
+              </p>
             </div>
-            <div style={{ height: '4px', background: 'rgba(255,255,255,0.06)', borderRadius: '2px', overflow: 'hidden' }}>
-              <div style={{
-                height: '100%',
-                width: `${pct}%`,
-                background: 'linear-gradient(90deg, var(--f1-red), #ff4d6d)',
-                borderRadius: '2px',
-                transition: 'width 0.5s ease',
-              }} />
-            </div>
+
+            {userRank !== null && totalPlayers > 1 && (
+              <div
+                className="flex-shrink-0 text-center px-8 py-4 rounded"
+                style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--f1-border)' }}
+              >
+                <div className="text-xs font-bold uppercase tracking-widest mb-1.5" style={{ color: 'var(--f1-muted)', letterSpacing: '0.15em' }}>
+                  Sua posição
+                </div>
+                <div className="font-black text-4xl leading-none text-white">
+                  {userRank}º
+                </div>
+                <div className="text-sm mt-1 mb-3" style={{ color: 'var(--f1-muted)' }}>{userPoints} pts</div>
+                <Link
+                  href="/leaderboard"
+                  className="text-xs font-black uppercase tracking-widest"
+                  style={{ color: 'var(--f1-red)', letterSpacing: '0.12em' }}
+                >
+                  Ver ranking →
+                </Link>
+              </div>
+            )}
           </div>
-        )
-      })()}
+
+          {/* Progresso da temporada */}
+          {total > 0 && (
+            <div className="mt-6 sm:max-w-md">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-black uppercase tracking-widest" style={{ color: 'var(--f1-muted)', letterSpacing: '0.15em' }}>
+                  Progresso da temporada
+                </span>
+                <span className="text-sm font-black text-white">
+                  {finished} / {total} <span className="font-normal" style={{ color: 'var(--f1-muted)' }}>corridas</span>
+                </span>
+              </div>
+              <div style={{ height: '5px', background: 'rgba(255,255,255,0.07)', borderRadius: '3px', overflow: 'hidden' }}>
+                <div style={{
+                  height: '100%',
+                  width: `${pct}%`,
+                  background: 'linear-gradient(90deg, var(--f1-red), #ff4d6d)',
+                  borderRadius: '3px',
+                  transition: 'width 0.5s ease',
+                }} />
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
 
       <DashboardRaces
         openRace={openRace}

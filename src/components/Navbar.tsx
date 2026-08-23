@@ -5,6 +5,13 @@ import { F1_LOGO_SRC } from '@/lib/f1logo'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { Bell } from 'lucide-react'
+
+function initials(username: string): string {
+  const words = username.trim().split(/\s+/).filter(Boolean)
+  if (words.length >= 2) return (words[0][0] + words[1][0]).toUpperCase()
+  return username.trim().slice(0, 2).toUpperCase()
+}
 
 export default function Navbar({ username, isAdmin }: { username: string; isAdmin?: boolean }) {
   const pathname = usePathname()
@@ -40,28 +47,26 @@ export default function Navbar({ username, isAdmin }: { username: string; isAdmi
           zIndex: 2,
         }}
       >
-        <div className="striped-accent-thick" />
-
-        <div className="container mx-auto max-w-4xl flex items-center h-12 px-4 gap-4">
+        <div className="container mx-auto max-w-6xl flex items-center h-14 px-4 gap-6">
           {/* Logo */}
           <Link href="/dashboard" className="flex items-center gap-2.5 flex-shrink-0" onClick={() => setMenuOpen(false)}>
-            <img src={F1_LOGO_SRC} alt="F1 Bolão" style={{ height: '36px', width: '36px', borderRadius: '8px' }} />
+            <img src={F1_LOGO_SRC} alt="F1 Bolão" style={{ height: '34px', width: '34px', borderRadius: '8px' }} />
           </Link>
 
           {/* Desktop nav links */}
-          <div className="hidden sm:flex items-center gap-1 flex-1">
+          <div className="hidden sm:flex items-center gap-2 flex-1 self-stretch">
             {links.map(l => {
               const active = pathname === l.href
               return (
                 <Link
                   key={l.href}
                   href={l.href}
-                  className="px-3 py-1 text-xs font-bold uppercase tracking-widest transition-colors relative"
+                  className="flex items-center px-3 text-xs font-black uppercase transition-colors self-stretch"
                   style={{
                     color: active ? 'white' : 'var(--f1-muted)',
-                    letterSpacing: '0.1em',
-                    borderBottom: active ? '2px solid var(--f1-red)' : '2px solid transparent',
-                    paddingBottom: '0.35rem',
+                    letterSpacing: '0.14em',
+                    borderBottom: active ? '3px solid var(--f1-red)' : '3px solid transparent',
+                    marginBottom: '-1px',
                   }}
                 >
                   {l.label}
@@ -72,22 +77,31 @@ export default function Navbar({ username, isAdmin }: { username: string; isAdmi
 
           {/* Desktop user area */}
           <div className="hidden sm:flex items-center gap-3 flex-shrink-0 ml-auto">
-            <span className="text-xs font-semibold uppercase tracking-widest" style={{ color: 'var(--f1-muted)' }}>
-              {username}
+            <Bell size={16} style={{ color: 'var(--f1-muted)' }} aria-hidden />
+            <span
+              className="flex items-center justify-center w-9 h-9 rounded-full text-xs font-black flex-shrink-0"
+              style={{ border: '1px solid var(--f1-border-light)', background: 'rgba(255,255,255,0.04)', color: 'white', letterSpacing: '0.05em' }}
+              title={username}
+            >
+              {initials(username)}
             </span>
             <button
               onClick={handleLogout}
-              className="btn-secondary text-xs"
-              style={{ padding: '0.3rem 0.75rem', letterSpacing: '0.08em' }}
+              className="text-xs font-black uppercase px-4 py-2 rounded"
+              style={{ border: '1px solid var(--f1-border-light)', color: 'white', letterSpacing: '0.12em', background: 'rgba(255,255,255,0.03)' }}
             >
               Sair
             </button>
           </div>
 
-          {/* Mobile: username + hamburger */}
+          {/* Mobile: avatar + hamburger */}
           <div className="flex sm:hidden items-center gap-3 ml-auto">
-            <span className="text-xs font-semibold uppercase tracking-widest truncate max-w-24" style={{ color: 'var(--f1-muted)' }}>
-              {username}
+            <span
+              className="flex items-center justify-center w-8 h-8 rounded-full text-xs font-black flex-shrink-0"
+              style={{ border: '1px solid var(--f1-border-light)', background: 'rgba(255,255,255,0.04)', color: 'white' }}
+              title={username}
+            >
+              {initials(username)}
             </span>
             <button
               onClick={() => setMenuOpen(o => !o)}

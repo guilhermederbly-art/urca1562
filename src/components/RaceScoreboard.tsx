@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import dynamic from 'next/dynamic'
 import GroupSelector, { type GroupInfo } from './GroupSelector'
 
@@ -27,7 +27,6 @@ interface Props {
 }
 
 export default function RaceScoreboard({ scores, currentUserId, hasChallengePoints, groups = [] }: Props) {
-  const [showConfetti, setShowConfetti] = useState(false)
   const [activeGroup, setActiveGroup] = useState('geral')
 
   const visibleScores = activeGroup === 'geral'
@@ -37,10 +36,8 @@ export default function RaceScoreboard({ scores, currentUserId, hasChallengePoin
   const userIndex = visibleScores.findIndex(s => s.user_id === currentUserId)
   const userIsFirst = userIndex === 0
 
-  useEffect(() => {
-    const globalFirst = scores[0]?.user_id === currentUserId && scores.length > 1
-    if (globalFirst) setShowConfetti(true)
-  }, [])
+  // Derivado direto dos props — não precisa de estado nem effect
+  const showConfetti = scores[0]?.user_id === currentUserId && scores.length > 1
 
   return (
     <>
@@ -56,12 +53,12 @@ export default function RaceScoreboard({ scores, currentUserId, hasChallengePoin
           </span>
         </div>
       )}
-      <div className="px-5 pt-4 pb-3 border-b flex items-center justify-between gap-3" style={{ borderColor: 'var(--f1-border)' }}>
+      <div className="px-5 pt-4 pb-3 border-b flex items-center justify-between gap-3 flex-wrap" style={{ borderColor: 'var(--f1-border)' }}>
         <div>
-          <div className="text-xs font-bold uppercase tracking-widest mb-0.5" style={{ color: 'var(--f1-gold)' }}>
-            Pontuação da rodada
+          <div className="text-sm font-black uppercase tracking-widest text-white mb-0.5 flex items-center gap-2">
+            <span aria-hidden style={{ color: 'var(--f1-red)' }}>📊</span> Pontuação da rodada
           </div>
-          <div className="font-black text-white">Ranking desta corrida</div>
+          <div className="text-sm font-bold text-white">Ranking desta corrida</div>
         </div>
         <GroupSelector groups={groups} value={activeGroup} onChange={setActiveGroup} />
       </div>
@@ -141,12 +138,8 @@ export default function RaceScoreboard({ scores, currentUserId, hasChallengePoin
                       <span
                         className="text-xs font-bold px-1.5 py-0.5 rounded"
                         style={{
-                          color: val === max ? '#22c55e' : val > 0 ? '#ffc000' : 'var(--f1-muted)',
-                          background: val === max
-                            ? 'rgba(34,197,94,0.12)'
-                            : val > 0
-                              ? 'rgba(255,192,0,0.12)'
-                              : 'rgba(138,138,160,0.06)',
+                          color: val > 0 ? '#22c55e' : 'var(--f1-muted)',
+                          background: val > 0 ? 'rgba(34,197,94,0.12)' : 'rgba(138,138,160,0.06)',
                         }}
                       >
                         {val > 0 ? `+${val}` : '0'}
