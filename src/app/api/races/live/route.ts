@@ -26,14 +26,14 @@ async function getEspnPositions(raceStartTime: string): Promise<{
   racePositions: { driverName: string; position: number }[]
   poleDriverName: string | null
   hasData: boolean
+  isCompleted: boolean
 }> {
   const res = await fetch(ESPN_URL, { next: { revalidate: 0 } })
-  if (!res.ok) return { racePositions: [], poleDriverName: null, hasData: false }
+  if (!res.ok) return { racePositions: [], poleDriverName: null, hasData: false, isCompleted: false }
 
   const data = await res.json() as { events: EspnEvent[] }
   const raceDate = new Date(raceStartTime)
 
-  // Find the event whose race competition date matches our race_start_time (within 6h)
   let raceComp: EspnCompetition | null = null
   let qualiComp: EspnCompetition | null = null
 
@@ -51,7 +51,7 @@ async function getEspnPositions(raceStartTime: string): Promise<{
   }
 
   if (!raceComp || !raceComp.competitors?.length) {
-    return { racePositions: [], poleDriverName: null, hasData: false }
+    return { racePositions: [], poleDriverName: null, hasData: false, isCompleted: false }
   }
 
   const racePositions = raceComp.competitors
@@ -60,10 +60,11 @@ async function getEspnPositions(raceStartTime: string): Promise<{
 
   const poleDriverName = qualiComp?.competitors?.find(c => c.order === 1)?.athlete.displayName ?? null
 
-  const inProgress = raceComp.status?.type?.state === 'in' || !raceComp.status?.type?.completed
+  const isCompleted = !!raceComp.status?.type?.completed
+  const inProgress = raceComp.status?.type?.state === 'in' || !isCompleted
   const hasData = racePositions.length > 0 && inProgress
 
-  return { racePositions, poleDriverName, hasData }
+  return { racePositions, poleDriverName, hasData, isCompleted }
 }
 
 // GET /api/races/live?raceId=xxx&demo=true
@@ -106,6 +107,7 @@ export async function GET(req: NextRequest) {
   let livePositions: LivePosition[] = []
   let poleDriverId: string | null = null
   let hasData = false
+  let raceFinished = race.status === 'finished'
 
   if (isDemo) {
     const shuffled = [...drivers].sort(() => Math.random() - 0.5)
@@ -120,6 +122,18 @@ export async function GET(req: NextRequest) {
         livePositions = espn.racePositions
         if (espn.poleDriverName) poleDriverId = findDriverByName(espn.poleDriverName)?.id ?? null
         hasData = true
+      }
+      if (espn.isCompleted) {
+        raceFinished = true
+        // Auto-finalize: if race ended and status is still 'closed', trigger fetch-results
+        if (race.status === 'closed' && race.openf1_race_session_key) {
+          const origin = req.nextUrl.origin
+          fetch(`${origin}/api/races/fetch-results`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ raceId: race.id }),
+          }).catch(() => {})
+        }
       }
     } catch {}
 
@@ -186,7 +200,7 @@ export async function GET(req: NextRequest) {
   }
 
   const leaderboardSource = isDemo
-    ? (profilesRaw ?? []).map(p => ({ ...makeFakePred(), challenge_answer: null, username: p.username }))
+    ? (profilesRaw ?? []).map(p => ({ ...makeFakePred(), challenge_answer: null, username: p.username, user_id: p.id }))
     : ((predictionsRaw ?? []) as PredRow[]).map(pred => ({ ...pred, username: pred.profiles?.username ?? '?' }))
 
   const challengeCorrect = race.challenge_correct ?? null
@@ -199,6 +213,7 @@ export async function GET(req: NextRequest) {
         challengeCorrect,
       )
       return {
+        userId: entry.user_id,
         username: entry.username,
         total: score.total_points,
         pole: score.pole_points,
@@ -225,6 +240,7 @@ export async function GET(req: NextRequest) {
     ok: true,
     isDemo,
     raceName: race.name,
+    raceFinished,
     randomPosition: race.random_position,
     challengeQuestion: race.challenge_question ?? null,
     challengeCorrect: race.challenge_correct ?? null,
