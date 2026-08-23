@@ -2,12 +2,20 @@
 
 import { useState, useEffect } from 'react'
 import Spinner from './Spinner'
+import GroupsPanel from './GroupsPanel'
 
 interface Entry {
   userId: string
   username: string
   total: number
   delta: number | undefined
+}
+
+interface GroupInfo {
+  id: string
+  name: string
+  code: string
+  memberIds: string[]
 }
 
 interface H2HRace { id: string; name: string; round: number; mine: number; theirs: number; winner: string }
@@ -116,19 +124,133 @@ const MEDAL_COLOR = [
   { bg: 'rgba(205,127,50,0.1)',  border: 'var(--f1-bronze)', text: 'var(--f1-bronze)', label: '03' },
 ]
 
-export default function LeaderboardClient({ entries, currentUserId }: { entries: Entry[]; currentUserId: string }) {
+export default function LeaderboardClient({
+  entries,
+  currentUserId,
+  groups: initialGroups,
+}: {
+  entries: Entry[]
+  currentUserId: string
+  groups: GroupInfo[]
+}) {
   const [h2hTarget, setH2hTarget] = useState<string | null>(null)
+  const [activeTab, setActiveTab] = useState<'geral' | string>('geral')
+  const [showGroupsPanel, setShowGroupsPanel] = useState(false)
+  const [localGroups, setLocalGroups] = useState<GroupInfo[]>(initialGroups)
+
+  const activeGroup = activeTab === 'geral' ? null : localGroups.find(g => g.id === activeTab) ?? null
+
+  const visibleEntries = activeGroup
+    ? entries.filter(e => activeGroup.memberIds.includes(e.userId))
+    : entries
+
+  function handleGroupJoined(group: { id: string; name: string; code: string }, memberIds: string[]) {
+    setLocalGroups(prev => {
+      if (prev.find(g => g.id === group.id)) return prev
+      return [...prev, { ...group, memberIds }]
+    })
+    setActiveTab(group.id)
+    setShowGroupsPanel(false)
+  }
+
+  function handleGroupCreated(group: { id: string; name: string; code: string }) {
+    setLocalGroups(prev => {
+      if (prev.find(g => g.id === group.id)) return prev
+      return [...prev, { ...group, memberIds: [currentUserId] }]
+    })
+    setActiveTab(group.id)
+    setShowGroupsPanel(false)
+  }
+
+  const panelGroups = localGroups.map(g => ({
+    id: g.id,
+    name: g.name,
+    code: g.code,
+    memberCount: g.memberIds.length,
+  }))
 
   return (
     <>
       {h2hTarget && <H2HModal userId={h2hTarget} onClose={() => setH2hTarget(null)} />}
+      {showGroupsPanel && (
+        <GroupsPanel
+          groups={panelGroups}
+          onClose={() => setShowGroupsPanel(false)}
+          onGroupJoined={handleGroupJoined}
+          onGroupCreated={handleGroupCreated}
+        />
+      )}
+
+      {/* Tab bar */}
+      <div className="flex gap-2 mb-4 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' }}>
+        <button
+          onClick={() => setActiveTab('geral')}
+          className="flex-shrink-0 px-3 py-1.5 rounded text-xs font-bold uppercase tracking-widest transition-all"
+          style={{
+            background: activeTab === 'geral' ? 'var(--f1-red)' : 'rgba(255,255,255,0.05)',
+            color: activeTab === 'geral' ? 'white' : 'var(--f1-muted)',
+            border: `1px solid ${activeTab === 'geral' ? 'var(--f1-red)' : 'var(--f1-border)'}`,
+          }}
+        >
+          🌍 Geral
+        </button>
+
+        {localGroups.map(g => (
+          <button
+            key={g.id}
+            onClick={() => setActiveTab(g.id)}
+            className="flex-shrink-0 px-3 py-1.5 rounded text-xs font-bold uppercase tracking-widest transition-all"
+            style={{
+              background: activeTab === g.id ? 'var(--f1-red)' : 'rgba(255,255,255,0.05)',
+              color: activeTab === g.id ? 'white' : 'var(--f1-muted)',
+              border: `1px solid ${activeTab === g.id ? 'var(--f1-red)' : 'var(--f1-border)'}`,
+              maxWidth: '9rem',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+            }}
+            title={g.name}
+          >
+            {g.name}
+          </button>
+        ))}
+
+        <button
+          onClick={() => setShowGroupsPanel(true)}
+          className="flex-shrink-0 px-3 py-1.5 rounded text-xs font-bold uppercase tracking-widest transition-all"
+          style={{
+            background: 'none',
+            color: 'var(--f1-muted)',
+            border: '1px dashed var(--f1-border)',
+          }}
+        >
+          + Grupos
+        </button>
+      </div>
+
+      {/* Group info bar when a group is active */}
+      {activeGroup && (
+        <div className="flex items-center justify-between px-3 py-2 mb-3 rounded text-xs" style={{ background: 'rgba(232,0,45,0.07)', border: '1px solid rgba(232,0,45,0.2)' }}>
+          <span style={{ color: 'var(--f1-muted)' }}>
+            <span className="font-bold text-white">{activeGroup.name}</span>
+            {' '}· {activeGroup.memberIds.length} membro{activeGroup.memberIds.length !== 1 ? 's' : ''}
+          </span>
+          <span
+            className="font-black tracking-widest cursor-pointer"
+            style={{ color: 'var(--f1-gold)', letterSpacing: '0.12em' }}
+            onClick={() => setShowGroupsPanel(true)}
+          >
+            {activeGroup.code}
+          </span>
+        </div>
+      )}
 
       <div className="card overflow-hidden">
         <div className="striped-accent-thick" />
 
-        {entries.length === 0 ? (
+        {visibleEntries.length === 0 ? (
           <p className="p-12 text-center text-sm uppercase tracking-widest" style={{ color: 'var(--f1-muted)' }}>
-            Nenhum palpite pontuado ainda
+            {activeGroup ? 'Nenhum membro com pontos neste grupo' : 'Nenhum palpite pontuado ainda'}
           </p>
         ) : (
           <div>
@@ -141,7 +263,7 @@ export default function LeaderboardClient({ entries, currentUserId }: { entries:
               <span className="text-right">PTS</span>
             </div>
 
-            {entries.map((entry, i) => {
+            {visibleEntries.map((entry, i) => {
               const isMe  = entry.userId === currentUserId
               const medal = MEDAL_COLOR[i]
               const delta = entry.delta
@@ -167,7 +289,7 @@ export default function LeaderboardClient({ entries, currentUserId }: { entries:
                     {isMe && (
                       <span className="text-xs font-bold uppercase tracking-widest" style={{ color: 'var(--f1-red)' }}>você</span>
                     )}
-                    {hasDelta && (
+                    {hasDelta && activeTab === 'geral' && (
                       <span
                         className="text-xs font-bold flex-shrink-0"
                         style={{ color: delta! > 0 ? '#22c55e' : '#ef4444' }}

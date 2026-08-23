@@ -3,14 +3,22 @@ import LeaderboardClient from '@/components/LeaderboardClient'
 
 export const metadata = { title: 'Ranking — F1 Bolão' }
 
+export interface GroupInfo {
+  id: string
+  name: string
+  code: string
+  memberIds: string[]
+}
+
 export default async function LeaderboardPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
-  const [{ data: profiles }, { data: scores }, { data: races }] = await Promise.all([
+  const [{ data: profiles }, { data: scores }, { data: races }, { data: myMemberships }] = await Promise.all([
     supabase.from('profiles').select('id, username'),
     supabase.from('scores').select('user_id, race_id, total_points'),
     supabase.from('races').select('id, round_number').eq('status', 'finished').order('round_number', { ascending: false }),
+    supabase.from('group_members').select('group_id').eq('user_id', user!.id),
   ])
 
   const scoreMap = (scores ?? []).reduce<Record<string, number>>((acc, s) => {
@@ -52,6 +60,30 @@ export default async function LeaderboardPage() {
   const leader = entries[0] ?? null
   const finishedCount = (races ?? []).length
 
+  // Fetch groups data
+  const groupIds = (myMemberships ?? []).map(m => m.group_id)
+  let groups: GroupInfo[] = []
+
+  if (groupIds.length > 0) {
+    const [{ data: groupsData }, { data: allMembersData }] = await Promise.all([
+      supabase.from('groups').select('id, name, code').in('id', groupIds),
+      supabase.from('group_members').select('group_id, user_id').in('group_id', groupIds),
+    ])
+
+    const membersByGroup: Record<string, string[]> = {}
+    for (const m of (allMembersData ?? [])) {
+      if (!membersByGroup[m.group_id]) membersByGroup[m.group_id] = []
+      membersByGroup[m.group_id].push(m.user_id)
+    }
+
+    groups = (groupsData ?? []).map(g => ({
+      id: g.id,
+      name: g.name,
+      code: g.code,
+      memberIds: membersByGroup[g.id] ?? [],
+    }))
+  }
+
   return (
     <div>
       <div className="mb-6">
@@ -61,7 +93,7 @@ export default async function LeaderboardPage() {
         <h1 className="f1-heading text-3xl">Ranking</h1>
       </div>
 
-      {/* Group stats */}
+      {/* Stats */}
       {finishedCount > 0 && (
         <div className="grid grid-cols-3 gap-3 mb-6">
           <div className="card p-3 text-center">
@@ -70,7 +102,7 @@ export default async function LeaderboardPage() {
             <div className="text-xs" style={{ color: 'var(--f1-muted)' }}>finalizadas</div>
           </div>
           <div className="card p-3 text-center">
-            <div className="text-xs font-bold uppercase tracking-widest mb-1" style={{ color: 'var(--f1-muted)', fontSize: '0.6rem' }}>Média do grupo</div>
+            <div className="text-xs font-bold uppercase tracking-widest mb-1" style={{ color: 'var(--f1-muted)', fontSize: '0.6rem' }}>Média geral</div>
             <div className="text-2xl font-black text-white">{avgPts}</div>
             <div className="text-xs" style={{ color: 'var(--f1-muted)' }}>pts / participante</div>
           </div>
@@ -82,7 +114,7 @@ export default async function LeaderboardPage() {
         </div>
       )}
 
-      <LeaderboardClient entries={entries} currentUserId={user!.id} />
+      <LeaderboardClient entries={entries} currentUserId={user!.id} groups={groups} />
     </div>
   )
 }

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import dynamic from 'next/dynamic'
+import GroupSelector, { type GroupInfo } from './GroupSelector'
 
 const Confetti = dynamic(() => import('./Confetti'), { ssr: false })
 
@@ -22,17 +23,23 @@ interface Props {
   scores: ScoreRow[]
   currentUserId: string
   hasChallengePoints: boolean
+  groups?: GroupInfo[]
 }
 
-export default function RaceScoreboard({ scores, currentUserId, hasChallengePoints }: Props) {
+export default function RaceScoreboard({ scores, currentUserId, hasChallengePoints, groups = [] }: Props) {
   const [showConfetti, setShowConfetti] = useState(false)
-  const userIndex = scores.findIndex(s => s.user_id === currentUserId)
+  const [activeGroup, setActiveGroup] = useState('geral')
+
+  const visibleScores = activeGroup === 'geral'
+    ? scores
+    : scores.filter(s => groups.find(g => g.id === activeGroup)?.memberIds.includes(s.user_id))
+
+  const userIndex = visibleScores.findIndex(s => s.user_id === currentUserId)
   const userIsFirst = userIndex === 0
 
   useEffect(() => {
-    if (userIsFirst && scores.length > 1) {
-      setShowConfetti(true)
-    }
+    const globalFirst = scores[0]?.user_id === currentUserId && scores.length > 1
+    if (globalFirst) setShowConfetti(true)
   }, [])
 
   return (
@@ -40,7 +47,7 @@ export default function RaceScoreboard({ scores, currentUserId, hasChallengePoin
       {showConfetti && <Confetti />}
     <div className="card overflow-hidden">
       <div className="striped-accent-thick" />
-      {userIsFirst && scores.length > 1 && (
+      {userIsFirst && visibleScores.length > 1 && (
         <div className="px-5 py-3 flex items-center gap-2 border-b animate-fade-in-up"
           style={{ borderColor: 'var(--f1-border)', background: 'rgba(255,192,0,0.07)' }}>
           <span className="text-xl">🏆</span>
@@ -49,11 +56,14 @@ export default function RaceScoreboard({ scores, currentUserId, hasChallengePoin
           </span>
         </div>
       )}
-      <div className="px-5 pt-4 pb-3 border-b" style={{ borderColor: 'var(--f1-border)' }}>
-        <div className="text-xs font-bold uppercase tracking-widest mb-0.5" style={{ color: 'var(--f1-gold)' }}>
-          Pontuação da rodada
+      <div className="px-5 pt-4 pb-3 border-b flex items-center justify-between gap-3" style={{ borderColor: 'var(--f1-border)' }}>
+        <div>
+          <div className="text-xs font-bold uppercase tracking-widest mb-0.5" style={{ color: 'var(--f1-gold)' }}>
+            Pontuação da rodada
+          </div>
+          <div className="font-black text-white">Ranking desta corrida</div>
         </div>
-        <div className="font-black text-white">Ranking desta corrida</div>
+        <GroupSelector groups={groups} value={activeGroup} onChange={setActiveGroup} />
       </div>
 
       <div className="overflow-x-auto">
@@ -75,7 +85,7 @@ export default function RaceScoreboard({ scores, currentUserId, hasChallengePoin
             </tr>
           </thead>
           <tbody>
-            {scores.map((row, i) => {
+            {visibleScores.map((row, i) => {
               const isMe = row.user_id === currentUserId
               const isFirst = i === 0
               const medal = isFirst ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : null

@@ -1,21 +1,36 @@
-import type { Driver, Race, Prediction } from '@/lib/types/database'
+'use client'
 
-interface ConsensusData {
-  pole:       Record<string, number>
-  p1:         Record<string, number>
-  p2:         Record<string, number>
-  p3:         Record<string, number>
-  random_pos: Record<string, number>
-  bortoleto:  Record<string, number>
-  challenge:  Record<string, number>
-  total:      number
+import { useState } from 'react'
+import type { Driver, Race } from '@/lib/types/database'
+import GroupSelector, { type GroupInfo } from './GroupSelector'
+
+export interface RawPrediction {
+  userId: string
+  pole_driver_id: string | null
+  p1_driver_id: string | null
+  p2_driver_id: string | null
+  p3_driver_id: string | null
+  random_pos_driver_id: string | null
+  bortoleto_position: number | null
+  challenge_answer: string | null
+}
+
+interface UserPrediction {
+  pole_driver_id?: string | null
+  p1_driver_id?: string | null
+  p2_driver_id?: string | null
+  p3_driver_id?: string | null
+  random_pos_driver_id?: string | null
+  bortoleto_position?: number | null
+  challenge_answer?: string | null
 }
 
 interface Props {
-  race:          Race
-  consensus:     ConsensusData
-  drivers:       Driver[]
-  userPrediction?: Prediction
+  race: Race
+  allPredictions: RawPrediction[]
+  drivers: Driver[]
+  userPrediction?: UserPrediction
+  groups?: GroupInfo[]
 }
 
 function driverAbbr(drivers: Driver[], id: string | null | undefined) {
@@ -23,11 +38,30 @@ function driverAbbr(drivers: Driver[], id: string | null | undefined) {
   return drivers.find(d => d.id === id)?.abbreviation ?? id.slice(0, 3).toUpperCase()
 }
 
-function Bar({
-  count, total, highlight, correct,
-}: {
-  count: number; total: number; highlight: boolean; correct: boolean
-}) {
+function buildConsensus(preds: RawPrediction[]) {
+  const out = {
+    pole: {} as Record<string, number>,
+    p1:   {} as Record<string, number>,
+    p2:   {} as Record<string, number>,
+    p3:   {} as Record<string, number>,
+    random_pos: {} as Record<string, number>,
+    bortoleto:  {} as Record<string, number>,
+    challenge:  {} as Record<string, number>,
+    total: preds.length,
+  }
+  for (const p of preds) {
+    if (p.pole_driver_id)       out.pole[p.pole_driver_id]                      = (out.pole[p.pole_driver_id] ?? 0) + 1
+    if (p.p1_driver_id)         out.p1[p.p1_driver_id]                          = (out.p1[p.p1_driver_id] ?? 0) + 1
+    if (p.p2_driver_id)         out.p2[p.p2_driver_id]                          = (out.p2[p.p2_driver_id] ?? 0) + 1
+    if (p.p3_driver_id)         out.p3[p.p3_driver_id]                          = (out.p3[p.p3_driver_id] ?? 0) + 1
+    if (p.random_pos_driver_id) out.random_pos[p.random_pos_driver_id]          = (out.random_pos[p.random_pos_driver_id] ?? 0) + 1
+    if (p.bortoleto_position != null) out.bortoleto[String(p.bortoleto_position)] = (out.bortoleto[String(p.bortoleto_position)] ?? 0) + 1
+    if (p.challenge_answer)     out.challenge[p.challenge_answer]                = (out.challenge[p.challenge_answer] ?? 0) + 1
+  }
+  return out
+}
+
+function Bar({ count, total, highlight, correct }: { count: number; total: number; highlight: boolean; correct: boolean }) {
   const pct = total > 0 ? Math.round((count / total) * 100) : 0
   const barColor = correct ? '#22c55e' : highlight ? 'var(--f1-red)' : 'rgba(255,255,255,0.15)'
   return (
@@ -37,20 +71,9 @@ function Bar({
   )
 }
 
-function CategoryConsensus({
-  label,
-  freq,
-  total,
-  userValue,
-  correctValue,
-  labelFn,
-}: {
-  label: string
-  freq: Record<string, number>
-  total: number
-  userValue?: string | null
-  correctValue?: string | null
-  labelFn: (k: string) => string
+function CategoryConsensus({ label, freq, total, userValue, correctValue, labelFn }: {
+  label: string; freq: Record<string, number>; total: number
+  userValue?: string | null; correctValue?: string | null; labelFn: (k: string) => string
 }) {
   const sorted = Object.entries(freq).sort((a, b) => b[1] - a[1]).slice(0, 5)
   if (sorted.length === 0) return null
@@ -59,30 +82,19 @@ function CategoryConsensus({
       <div className="text-xs font-black uppercase tracking-widest mb-3" style={{ color: 'var(--f1-muted)' }}>{label}</div>
       <div className="flex flex-col gap-1.5">
         {sorted.map(([key, count]) => {
-          const pct  = total > 0 ? Math.round((count / total) * 100) : 0
-          const isMe = userValue === key
+          const pct    = total > 0 ? Math.round((count / total) * 100) : 0
+          const isMe   = userValue === key
           const isCorrect = correctValue != null && correctValue === key
           return (
             <div key={key} className="flex items-center gap-2">
-              <span
-                className="text-xs font-black w-10 flex-shrink-0"
-                style={{ color: isCorrect ? '#22c55e' : isMe ? 'var(--f1-red)' : 'var(--f1-text)' }}
-              >
+              <span className="text-xs font-black w-10 flex-shrink-0" style={{ color: isCorrect ? '#22c55e' : isMe ? 'var(--f1-red)' : 'var(--f1-text)' }}>
                 {labelFn(key)}
               </span>
               <Bar count={count} total={total} highlight={isMe} correct={isCorrect} />
-              <span className="text-xs font-bold w-8 text-right flex-shrink-0" style={{ color: 'var(--f1-muted)' }}>
-                {pct}%
-              </span>
-              <span className="text-xs w-8 flex-shrink-0" style={{ color: 'var(--f1-muted)', fontSize: '0.62rem' }}>
-                {count}x
-              </span>
-              {isMe && !isCorrect && (
-                <span className="text-xs font-black flex-shrink-0" style={{ color: 'var(--f1-red)', fontSize: '0.6rem' }}>você</span>
-              )}
-              {isCorrect && (
-                <span className="text-xs font-black flex-shrink-0" style={{ color: '#22c55e', fontSize: '0.6rem' }}>✓</span>
-              )}
+              <span className="text-xs font-bold w-8 text-right flex-shrink-0" style={{ color: 'var(--f1-muted)' }}>{pct}%</span>
+              <span className="text-xs w-8 flex-shrink-0" style={{ color: 'var(--f1-muted)', fontSize: '0.62rem' }}>{count}x</span>
+              {isMe && !isCorrect && <span className="text-xs font-black flex-shrink-0" style={{ color: 'var(--f1-red)', fontSize: '0.6rem' }}>você</span>}
+              {isCorrect && <span className="text-xs font-black flex-shrink-0" style={{ color: '#22c55e', fontSize: '0.6rem' }}>✓</span>}
             </div>
           )
         })}
@@ -91,7 +103,14 @@ function CategoryConsensus({
   )
 }
 
-export default function RaceConsensus({ race, consensus, drivers, userPrediction }: Props) {
+export default function RaceConsensus({ race, allPredictions, drivers, userPrediction, groups = [] }: Props) {
+  const [activeGroup, setActiveGroup] = useState('geral')
+
+  const filteredPreds = activeGroup === 'geral'
+    ? allPredictions
+    : allPredictions.filter(p => groups.find(g => g.id === activeGroup)?.memberIds.includes(p.userId))
+
+  const consensus = buildConsensus(filteredPreds)
   if (consensus.total === 0) return null
 
   const driverLabel = (id: string) => driverAbbr(drivers, id)
@@ -100,75 +119,29 @@ export default function RaceConsensus({ race, consensus, drivers, userPrediction
   return (
     <div className="card overflow-hidden">
       <div className="striped-accent-thick" />
-      <div className="px-5 pt-4 pb-1 flex items-center justify-between">
-        <h2 className="text-xs font-black uppercase tracking-widest" style={{ color: 'var(--f1-red)' }}>
-          Consenso do grupo
-        </h2>
-        <span className="text-xs" style={{ color: 'var(--f1-muted)' }}>{consensus.total} palpite{consensus.total !== 1 ? 's' : ''}</span>
+      <div className="px-5 pt-4 pb-1 flex items-center justify-between gap-3 flex-wrap">
+        <div className="flex items-center gap-3">
+          <h2 className="text-xs font-black uppercase tracking-widest" style={{ color: 'var(--f1-red)' }}>
+            Consenso do grupo
+          </h2>
+          <span className="text-xs" style={{ color: 'var(--f1-muted)' }}>{consensus.total} palpite{consensus.total !== 1 ? 's' : ''}</span>
+        </div>
+        <GroupSelector groups={groups} value={activeGroup} onChange={setActiveGroup} />
       </div>
       <div className="px-5 py-4">
-        <CategoryConsensus
-          label="Pole Position"
-          freq={consensus.pole}
-          total={consensus.total}
-          userValue={userPrediction?.pole_driver_id}
-          correctValue={null}
-          labelFn={driverLabel}
-        />
-        <CategoryConsensus
-          label="1° Lugar"
-          freq={consensus.p1}
-          total={consensus.total}
-          userValue={userPrediction?.p1_driver_id}
-          correctValue={null}
-          labelFn={driverLabel}
-        />
-        <CategoryConsensus
-          label="2° Lugar"
-          freq={consensus.p2}
-          total={consensus.total}
-          userValue={userPrediction?.p2_driver_id}
-          correctValue={null}
-          labelFn={driverLabel}
-        />
-        <CategoryConsensus
-          label="3° Lugar"
-          freq={consensus.p3}
-          total={consensus.total}
-          userValue={userPrediction?.p3_driver_id}
-          correctValue={null}
-          labelFn={driverLabel}
-        />
+        <CategoryConsensus label="Pole Position" freq={consensus.pole} total={consensus.total} userValue={userPrediction?.pole_driver_id} correctValue={null} labelFn={driverLabel} />
+        <CategoryConsensus label="1° Lugar" freq={consensus.p1} total={consensus.total} userValue={userPrediction?.p1_driver_id} correctValue={null} labelFn={driverLabel} />
+        <CategoryConsensus label="2° Lugar" freq={consensus.p2} total={consensus.total} userValue={userPrediction?.p2_driver_id} correctValue={null} labelFn={driverLabel} />
+        <CategoryConsensus label="3° Lugar" freq={consensus.p3} total={consensus.total} userValue={userPrediction?.p3_driver_id} correctValue={null} labelFn={driverLabel} />
         {race.random_position && Object.keys(consensus.random_pos).length > 0 && (
-          <CategoryConsensus
-            label={`Posição Aleatória — P${race.random_position} 🎲`}
-            freq={consensus.random_pos}
-            total={consensus.total}
-            userValue={userPrediction?.random_pos_driver_id}
-            correctValue={null}
-            labelFn={driverLabel}
-          />
+          <CategoryConsensus label={`Posição Aleatória — P${race.random_position} 🎲`} freq={consensus.random_pos} total={consensus.total} userValue={userPrediction?.random_pos_driver_id} correctValue={null} labelFn={driverLabel} />
         )}
         {Object.keys(consensus.bortoleto).length > 0 && (
-          <CategoryConsensus
-            label="Bortoleto 🇧🇷"
-            freq={consensus.bortoleto}
-            total={consensus.total}
-            userValue={userPrediction?.bortoleto_position != null ? String(userPrediction.bortoleto_position) : null}
-            correctValue={null}
-            labelFn={posLabel}
-          />
+          <CategoryConsensus label="Bortoleto 🇧🇷" freq={consensus.bortoleto} total={consensus.total} userValue={userPrediction?.bortoleto_position != null ? String(userPrediction.bortoleto_position) : null} correctValue={null} labelFn={posLabel} />
         )}
         {race.challenge_question && Object.keys(consensus.challenge).length > 0 && (
           <div className="border-0">
-            <CategoryConsensus
-              label={`Desafio ⚡ — ${race.challenge_question}`}
-              freq={consensus.challenge}
-              total={consensus.total}
-              userValue={userPrediction?.challenge_answer}
-              correctValue={race.challenge_correct}
-              labelFn={(k) => k}
-            />
+            <CategoryConsensus label={`Desafio ⚡ — ${race.challenge_question}`} freq={consensus.challenge} total={consensus.total} userValue={userPrediction?.challenge_answer} correctValue={race.challenge_correct} labelFn={(k) => k} />
           </div>
         )}
       </div>

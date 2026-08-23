@@ -145,3 +145,42 @@ insert into public.drivers (name, abbreviation, team, number, is_bortoleto) valu
   ('Isack Hadjar', 'HAD', 'Racing Bulls', 6, false),
   ('Oliver Bearman', 'BEA', 'Haas', 87, false),
   ('Esteban Ocon', 'OCO', 'Haas', 31, false);
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- Grupos (leaderboard privado entre amigos)
+-- Nota: estas duas tabelas foram criadas manualmente em produção antes de
+-- entrarem neste arquivo. Rodar este bloco só é necessário em um banco novo.
+-- ─────────────────────────────────────────────────────────────────────────────
+
+create table if not exists public.groups (
+  id uuid default uuid_generate_v4() primary key,
+  name text not null,
+  code text unique not null, -- código de 5 caracteres compartilhado com os amigos
+  created_by uuid references auth.users on delete set null,
+  created_at timestamptz default now()
+);
+
+create table if not exists public.group_members (
+  id uuid default uuid_generate_v4() primary key,
+  group_id uuid references public.groups on delete cascade not null,
+  user_id uuid references auth.users on delete cascade not null,
+  joined_at timestamptz default now(),
+  unique (group_id, user_id)
+);
+
+create index if not exists group_members_user_id_idx on public.group_members (user_id);
+create index if not exists group_members_group_id_idx on public.group_members (group_id);
+
+alter table public.groups enable row level security;
+alter table public.group_members enable row level security;
+
+-- Grupos: todos podem ler (necessário para entrar por código); só o próprio
+-- usuário autenticado pode criar
+create policy "groups_select" on public.groups for select using (true);
+create policy "groups_insert" on public.groups for insert with check (auth.uid() = created_by);
+
+-- Membros: todos podem ler (o ranking por grupo precisa da lista); cada usuário
+-- só pode inserir/remover a si mesmo
+create policy "group_members_select" on public.group_members for select using (true);
+create policy "group_members_insert" on public.group_members for insert with check (auth.uid() = user_id);
+create policy "group_members_delete" on public.group_members for delete using (auth.uid() = user_id);

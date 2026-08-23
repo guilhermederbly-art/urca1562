@@ -5,19 +5,21 @@ import { ptBR } from 'date-fns/locale'
 import Link from 'next/link'
 import PredictionForm from '@/components/PredictionForm'
 import RaceResultsView from '@/components/RaceResultsView'
-import RaceConsensus from '@/components/RaceConsensus'
+import RaceConsensus, { type RawPrediction } from '@/components/RaceConsensus'
 import RaceScoreboard from '@/components/RaceScoreboard'
+import type { GroupInfo } from '@/components/GroupSelector'
 
 export default async function RacePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
-  const [{ data: race }, { data: drivers }, { data: prediction }, { data: result }] = await Promise.all([
+  const [{ data: race }, { data: drivers }, { data: prediction }, { data: result }, { data: myMemberships }] = await Promise.all([
     supabase.from('races').select('*').eq('id', id).single(),
     supabase.from('drivers').select('*').order('number'),
     supabase.from('predictions').select('*').eq('race_id', id).eq('user_id', user!.id).maybeSingle(),
     supabase.from('race_results').select('*').eq('race_id', id).maybeSingle(),
+    supabase.from('group_members').select('group_id').eq('user_id', user!.id),
   ])
 
   if (!race) notFound()
@@ -25,7 +27,27 @@ export default async function RacePage({ params }: { params: Promise<{ id: strin
   const isOpen = race.status === 'open'
   const isFinished = race.status === 'finished'
 
-  // Pontuação por participante — apenas quando finalizada
+  // Fetch groups for the current user
+  const groupIds = (myMemberships ?? []).map(m => m.group_id)
+  let groups: GroupInfo[] = []
+  if (groupIds.length > 0) {
+    const [{ data: groupsData }, { data: allMembersData }] = await Promise.all([
+      supabase.from('groups').select('id, name, code').in('id', groupIds),
+      supabase.from('group_members').select('group_id, user_id').in('group_id', groupIds),
+    ])
+    const membersByGroup: Record<string, string[]> = {}
+    for (const m of (allMembersData ?? [])) {
+      if (!membersByGroup[m.group_id]) membersByGroup[m.group_id] = []
+      membersByGroup[m.group_id].push(m.user_id)
+    }
+    groups = (groupsData ?? []).map(g => ({
+      id: g.id,
+      name: g.name,
+      memberIds: membersByGroup[g.id] ?? [],
+    }))
+  }
+
+  // Score rows — only when finished
   let scores: { username: string; total_points: number; pole_points: number; p1_points: number; p2_points: number; p3_points: number; random_pos_points: number; bortoleto_points: number; challenge_points: number; user_id: string }[] = []
   if (isFinished) {
     const { data: scoresRaw } = await supabase
@@ -47,22 +69,20 @@ export default async function RacePage({ params }: { params: Promise<{ id: strin
     }))
   }
 
-  // Consenso — disponível após o fechamento
-  type FreqMap = Record<string, number>
-  const consensus = { pole: {} as FreqMap, p1: {} as FreqMap, p2: {} as FreqMap, p3: {} as FreqMap, random_pos: {} as FreqMap, bortoleto: {} as FreqMap, challenge: {} as FreqMap, total: 0 }
+  // Raw predictions for consensus (available after close)
+  let allPredictions: RawPrediction[] = []
   if (!isOpen) {
     const { data: allPreds } = await supabase.from('predictions').select('*').eq('race_id', id)
-    const preds = allPreds ?? []
-    consensus.total = preds.length
-    for (const p of preds) {
-      if (p.pole_driver_id)        consensus.pole[p.pole_driver_id]                     = (consensus.pole[p.pole_driver_id] ?? 0) + 1
-      if (p.p1_driver_id)          consensus.p1[p.p1_driver_id]                         = (consensus.p1[p.p1_driver_id] ?? 0) + 1
-      if (p.p2_driver_id)          consensus.p2[p.p2_driver_id]                         = (consensus.p2[p.p2_driver_id] ?? 0) + 1
-      if (p.p3_driver_id)          consensus.p3[p.p3_driver_id]                         = (consensus.p3[p.p3_driver_id] ?? 0) + 1
-      if (p.random_pos_driver_id)  consensus.random_pos[p.random_pos_driver_id]         = (consensus.random_pos[p.random_pos_driver_id] ?? 0) + 1
-      if (p.bortoleto_position != null) consensus.bortoleto[String(p.bortoleto_position)] = (consensus.bortoleto[String(p.bortoleto_position)] ?? 0) + 1
-      if (p.challenge_answer)      consensus.challenge[p.challenge_answer]               = (consensus.challenge[p.challenge_answer] ?? 0) + 1
-    }
+    allPredictions = (allPreds ?? []).map(p => ({
+      userId: p.user_id,
+      pole_driver_id: p.pole_driver_id,
+      p1_driver_id: p.p1_driver_id,
+      p2_driver_id: p.p2_driver_id,
+      p3_driver_id: p.p3_driver_id,
+      random_pos_driver_id: p.random_pos_driver_id,
+      bortoleto_position: p.bortoleto_position,
+      challenge_answer: p.challenge_answer,
+    }))
   }
 
   return (
@@ -90,7 +110,7 @@ export default async function RacePage({ params }: { params: Promise<{ id: strin
         )}
       </div>
 
-      {/* Deadline warning */}
+      {/* Status banners */}
       {isOpen && (
         <div className="mb-6 p-3 rounded border text-sm"
           style={{ borderColor: '#22c55e', backgroundColor: 'rgba(34,197,94,0.08)', color: '#22c55e' }}>
@@ -106,7 +126,7 @@ export default async function RacePage({ params }: { params: Promise<{ id: strin
         </div>
       )}
 
-      {/* Prediction form or results */}
+      {/* Content */}
       {isOpen ? (
         <PredictionForm
           race={race}
@@ -127,14 +147,16 @@ export default async function RacePage({ params }: { params: Promise<{ id: strin
               scores={scores}
               currentUserId={user!.id}
               hasChallengePoints={scores.some(s => s.challenge_points > 0)}
+              groups={groups}
             />
           )}
-          {consensus.total > 0 && (
+          {allPredictions.length > 0 && !isFinished && (
             <RaceConsensus
               race={race}
-              consensus={consensus}
+              allPredictions={allPredictions}
               drivers={drivers ?? []}
               userPrediction={prediction ?? undefined}
+              groups={groups}
             />
           )}
         </div>

@@ -113,6 +113,18 @@ export interface Database {
         }
         Relationships: []
       }
+      groups: {
+        Row: { id: string; name: string; code: string; created_by: string | null; created_at: string }
+        Insert: { name: string; code: string; created_by?: string | null; id?: string; created_at?: string }
+        Update: { name?: string }
+        Relationships: []
+      }
+      group_members: {
+        Row: { id: string; group_id: string; user_id: string; joined_at: string }
+        Insert: { group_id: string; user_id: string; id?: string; joined_at?: string }
+        Update: never
+        Relationships: []
+      }
     }
     Views: Record<string, never>
     Functions: Record<string, never>
@@ -121,6 +133,8 @@ export interface Database {
   }
 }
 
+export type Group = Database['public']['Tables']['groups']['Row']
+export type GroupMember = Database['public']['Tables']['group_members']['Row']
 export type Profile = Database['public']['Tables']['profiles']['Row']
 export type Driver = Database['public']['Tables']['drivers']['Row']
 export type Race = Database['public']['Tables']['races']['Row']

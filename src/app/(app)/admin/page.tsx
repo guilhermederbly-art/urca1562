@@ -12,10 +12,12 @@ export default async function AdminPage() {
 
   const serviceSupabase = await createServiceClient()
 
-  const [{ data: races }, { data: drivers }, { data: profiles }] = await Promise.all([
+  const [{ data: races }, { data: drivers }, { data: profiles }, { data: groupsRaw }, { data: groupMembersRaw }] = await Promise.all([
     supabase.from('races').select('*').order('round_number'),
     supabase.from('drivers').select('*').order('number'),
     serviceSupabase.from('profiles').select('id, username, created_at, last_seen_at').order('created_at'),
+    serviceSupabase.from('groups').select('id, name, code, created_at').order('created_at'),
+    serviceSupabase.from('group_members').select('group_id'),
   ])
 
   // Get auth users list to cross-reference emails
@@ -26,6 +28,15 @@ export default async function AdminPage() {
     ...p,
     email: authById.get(p.id)?.email ?? '',
     last_seen_at: p.last_seen_at ?? null,
+  }))
+
+  const memberCountById: Record<string, number> = {}
+  for (const m of (groupMembersRaw ?? [])) {
+    memberCountById[m.group_id] = (memberCountById[m.group_id] ?? 0) + 1
+  }
+  const groups = (groupsRaw ?? []).map(g => ({
+    ...g,
+    memberCount: memberCountById[g.id] ?? 0,
   }))
 
   // Fetch predictions for the currently open race (if any)
@@ -51,6 +62,7 @@ export default async function AdminPage() {
         races={races ?? []}
         drivers={drivers ?? []}
         users={users}
+        groups={groups}
         openRaceName={openRace?.name}
         predictedUserIds={predictedUserIds}
       />

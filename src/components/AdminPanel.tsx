@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { format } from 'date-fns'
+import { format, formatDistanceToNow } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import type { Race, Driver } from '@/lib/types/database'
 
@@ -14,10 +14,19 @@ interface UserRow {
   last_seen_at: string | null
 }
 
+interface GroupRow {
+  id: string
+  name: string
+  code: string
+  created_at: string
+  memberCount: number
+}
+
 interface Props {
   races: Race[]
   drivers: Driver[]
   users: UserRow[]
+  groups: GroupRow[]
   openRaceName?: string
   predictedUserIds?: string[]
 }
@@ -29,7 +38,7 @@ const STATUS_LABEL: Record<string, string> = {
   finished: 'Finalizada',
 }
 
-export default function AdminPanel({ races, drivers, users, openRaceName, predictedUserIds = [] }: Props) {
+export default function AdminPanel({ races, drivers, users, groups, openRaceName, predictedUserIds = [] }: Props) {
   const predictedSet = new Set(predictedUserIds)
   const router = useRouter()
   const [loading, setLoading] = useState<string | null>(null)
@@ -131,10 +140,16 @@ export default function AdminPanel({ races, drivers, users, openRaceName, predic
   }
 
   const now = new Date()
-  // Oculta corridas já passadas (pela data) ou finalizadas
+  // Corridas ativas (não finalizadas)
   const visibleRaces = races.filter(r =>
     r.status !== 'finished' && new Date(r.race_start_time) >= now
   )
+  // Corridas finalizadas nos últimos 14 dias (para re-importar se necessário)
+  const recentFinishedRaces = races.filter(r => {
+    if (r.status !== 'finished') return false
+    const daysSince = (now.getTime() - new Date(r.race_start_time).getTime()) / (1000 * 60 * 60 * 24)
+    return daysSince <= 14
+  })
   // Corridas finalizadas com desafio sem resposta definida
   const pendingChallengeRaces = races.filter(r =>
     r.challenge_question && !r.challenge_correct
@@ -174,6 +189,16 @@ export default function AdminPanel({ races, drivers, users, openRaceName, predic
                   )}
                 </div>
                 <div className="flex flex-wrap gap-2 flex-shrink-0">
+                  {race.status === 'upcoming' && (
+                    <button
+                      onClick={() => openPredictions(race.id)}
+                      className="text-xs px-3 py-1.5 rounded font-bold border"
+                      style={{ borderColor: '#22c55e', color: '#22c55e' }}
+                      disabled={!!loading}
+                    >
+                      {loading === race.id + '-open' ? '...' : '▶ Abrir palpites'}
+                    </button>
+                  )}
                   {race.status === 'open' && !race.challenge_question && (
                     <button
                       onClick={() => assignChallenge(race.id)}
@@ -253,6 +278,74 @@ export default function AdminPanel({ races, drivers, users, openRaceName, predic
           )}
         </div>
       </div>
+
+      {/* Corridas recentes finalizadas */}
+      {recentFinishedRaces.length > 0 && (
+        <div className="card overflow-hidden">
+          <div className="px-5 py-4 border-b" style={{ borderColor: 'var(--f1-border)' }}>
+            <h2 className="font-bold">Corridas recentes</h2>
+            <p className="text-xs mt-0.5" style={{ color: 'var(--f1-muted)' }}>
+              Re-importe resultados se a pontuação estiver incorreta ou zerada.
+            </p>
+          </div>
+          <div>
+            {recentFinishedRaces.map(race => (
+              <div key={race.id} className="border-b last:border-0 px-5 py-4 flex items-start gap-4" style={{ borderColor: 'var(--f1-border)' }}>
+                <div className="flex-1">
+                  <div className="font-bold">{race.round_number}. {race.name}</div>
+                  <div className="text-xs mt-0.5" style={{ color: 'var(--f1-muted)' }}>
+                    {format(new Date(race.race_start_time), "dd/MM/yyyy", { locale: ptBR })}
+                    {race.challenge_question && (
+                      <span className="ml-2" style={{ color: 'rgba(255,192,0,0.8)' }}>
+                        ⚡ {race.challenge_question}
+                        {race.challenge_correct && <span className="font-bold"> → {race.challenge_correct}</span>}
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <div className="flex flex-wrap gap-2 flex-shrink-0">
+                  {race.challenge_question && !race.challenge_correct && (
+                    <button
+                      onClick={() => setChallengeExpanded(challengeExpanded === race.id ? null : race.id)}
+                      className="text-xs px-3 py-1.5 rounded font-bold border"
+                      style={{ borderColor: 'rgba(255,192,0,0.6)', color: 'rgba(255,192,0,0.9)' }}
+                      disabled={!!loading}
+                    >
+                      ⚡ Definir resposta
+                    </button>
+                  )}
+                  <button
+                    onClick={() => fetchResults(race.id)}
+                    className="text-xs px-3 py-1.5 rounded font-bold border"
+                    style={{ borderColor: '#22c55e', color: '#22c55e' }}
+                    disabled={!!loading}
+                  >
+                    {loading === race.id + '-results' ? 'Importando...' : '↻ Re-importar resultados'}
+                  </button>
+                </div>
+                {challengeExpanded === race.id && race.challenge_options && (
+                  <div className="w-full mt-2">
+                    <p className="text-xs mb-2" style={{ color: 'var(--f1-muted)' }}>Qual foi a resposta correta?</p>
+                    <div className="flex flex-wrap gap-2">
+                      {race.challenge_options.map(opt => (
+                        <button
+                          key={opt}
+                          onClick={() => { setChallenge(race.id, opt); setChallengeExpanded(null) }}
+                          className="text-xs px-3 py-1.5 rounded font-bold border"
+                          style={{ borderColor: 'rgba(255,192,0,0.5)', color: 'rgba(255,192,0,0.9)', background: 'rgba(255,192,0,0.08)' }}
+                          disabled={loading === race.id + '-challenge'}
+                        >
+                          {opt}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Desafios pendentes */}
       {pendingChallengeRaces.length > 0 && (
@@ -369,8 +462,8 @@ export default function AdminPanel({ races, drivers, users, openRaceName, predic
               <div className="text-right text-xs flex-shrink-0" style={{ color: 'var(--f1-muted)' }}>
                 <div>desde {format(new Date(u.created_at), 'dd/MM/yyyy', { locale: ptBR })}</div>
                 {u.last_seen_at ? (
-                  <div className="mt-0.5 font-semibold" style={{ color: 'white' }}>
-                    visto {format(new Date(u.last_seen_at), "dd/MM HH:mm", { locale: ptBR })}
+                  <div className="mt-0.5 font-semibold" style={{ color: 'white' }} title={format(new Date(u.last_seen_at), "dd/MM/yyyy HH:mm", { locale: ptBR })}>
+                    {formatDistanceToNow(new Date(u.last_seen_at), { locale: ptBR, addSuffix: true })}
                   </div>
                 ) : (
                   <div className="mt-0.5">nunca acessou</div>
@@ -407,6 +500,36 @@ export default function AdminPanel({ races, drivers, users, openRaceName, predic
           )})}
           {users.length === 0 && (
             <p className="px-5 py-6 text-sm" style={{ color: 'var(--f1-muted)' }}>Nenhum usuário cadastrado.</p>
+          )}
+        </div>
+      </div>
+
+      {/* ── Grupos ─────────────────────────────────────────────────── */}
+      <div className="card overflow-hidden">
+        <div className="px-5 py-4 border-b" style={{ borderColor: 'var(--f1-border)' }}>
+          <h2 className="font-bold">
+            Grupos <span className="text-xs font-normal ml-1" style={{ color: 'var(--f1-muted)' }}>({groups.length})</span>
+          </h2>
+        </div>
+        <div className="divide-y" style={{ borderColor: 'var(--f1-border)' }}>
+          {groups.map(g => (
+            <div key={g.id} className="px-5 py-3 flex items-center justify-between gap-4">
+              <div className="flex-1 min-w-0">
+                <div className="font-bold text-sm text-white">{g.name}</div>
+                <div className="text-xs mt-0.5" style={{ color: 'var(--f1-muted)' }}>
+                  {g.memberCount} {g.memberCount === 1 ? 'membro' : 'membros'} · criado em {format(new Date(g.created_at), 'dd/MM/yyyy', { locale: ptBR })}
+                </div>
+              </div>
+              <span
+                className="font-black tracking-widest flex-shrink-0"
+                style={{ color: 'var(--f1-gold)', letterSpacing: '0.15em', fontSize: '1rem' }}
+              >
+                {g.code}
+              </span>
+            </div>
+          ))}
+          {groups.length === 0 && (
+            <p className="px-5 py-6 text-sm" style={{ color: 'var(--f1-muted)' }}>Nenhum grupo criado ainda.</p>
           )}
         </div>
       </div>
