@@ -231,11 +231,11 @@ function CircuitDetailsModal({ race, onClose }: { race: Race; onClose: () => voi
       style={{ background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(4px)' }}
       onClick={e => { if (e.target === e.currentTarget) onClose() }}
     >
-      <div className="card w-full max-w-sm overflow-hidden" style={{ borderRadius: '4px' }}>
-        <div className="striped-accent-thick" />
+      <div className="card w-full max-w-sm max-h-[85vh] flex flex-col overflow-hidden" style={{ borderRadius: '4px' }}>
+        <div className="striped-accent-thick flex-shrink-0" />
 
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b" style={{ borderColor: 'var(--f1-border)' }}>
+        <div className="flex items-center justify-between px-5 py-4 border-b flex-shrink-0" style={{ borderColor: 'var(--f1-border)' }}>
           <div>
             <div className="text-xs font-bold uppercase tracking-widest mb-0.5" style={{ color: 'var(--f1-red)' }}>Circuito</div>
             <div className="font-black text-white">{race.name}</div>
@@ -243,6 +243,7 @@ function CircuitDetailsModal({ race, onClose }: { race: Race; onClose: () => voi
           <button onClick={onClose} className="text-xl font-bold leading-none" style={{ color: 'var(--f1-muted)' }}>✕</button>
         </div>
 
+        <div className="flex-1 overflow-y-auto">
         {/* Traçado */}
         <div style={{ background: '#000', overflow: 'hidden', lineHeight: 0 }}>
           {imgSrc ? (
@@ -311,6 +312,7 @@ function CircuitDetailsModal({ race, onClose }: { race: Race; onClose: () => voi
             </div>
           </div>
         )}
+        </div>
       </div>
     </div>
   )

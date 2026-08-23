@@ -28,8 +28,18 @@ export default function Navbar({ username, isAdmin }: { username: string; isAdmi
   ]
 
   return (
-    <>
-      <nav style={{ backgroundColor: '#0d0d14', borderBottom: '1px solid #2a2a3e' }}>
+    <div className="relative">
+      <nav
+        style={{
+          backgroundColor: '#0d0d14',
+          borderBottom: '1px solid #2a2a3e',
+          // Instalado como PWA no iOS o conteudo comeca embaixo da barra de
+          // status; sem isso a navbar fica parcialmente escondida no notch
+          paddingTop: 'env(safe-area-inset-top)',
+          position: 'relative',
+          zIndex: 2,
+        }}
+      >
         <div className="striped-accent-thick" />
 
         <div className="container mx-auto max-w-4xl flex items-center h-12 px-4 gap-4">
@@ -81,8 +91,9 @@ export default function Navbar({ username, isAdmin }: { username: string; isAdmi
             </span>
             <button
               onClick={() => setMenuOpen(o => !o)}
-              className="flex flex-col justify-center items-center gap-1.5 w-8 h-8 flex-shrink-0"
+              className="flex flex-col justify-center items-center gap-1.5 w-11 h-11 -mr-2 flex-shrink-0"
               aria-label="Menu"
+              aria-expanded={menuOpen}
             >
               <span
                 className="block w-5 h-0.5 transition-all duration-200"
@@ -110,17 +121,18 @@ export default function Navbar({ username, isAdmin }: { username: string; isAdmi
         </div>
       </nav>
 
-      {/* Mobile dropdown menu */}
+      {/* Mobile dropdown menu — ancorado no rodape da navbar em vez de um
+          offset fixo em px, que nao acompanhava a altura real da barra */}
       {menuOpen && (
-        <div
-          className="sm:hidden fixed inset-0 z-40"
-          style={{ top: '49px' }}
-          onClick={() => setMenuOpen(false)}
-        >
+        <>
           <div
-            className="flex flex-col border-b"
-            style={{ backgroundColor: '#0d0d14', borderColor: '#2a2a3e' }}
-            onClick={e => e.stopPropagation()}
+            className="sm:hidden fixed inset-0"
+            style={{ zIndex: 1 }}
+            onClick={() => setMenuOpen(false)}
+          />
+          <div
+            className="sm:hidden absolute left-0 right-0 flex flex-col border-b"
+            style={{ top: '100%', backgroundColor: '#0d0d14', borderColor: '#2a2a3e', zIndex: 2 }}
           >
             {links.map(l => {
               const active = pathname === l.href
@@ -149,8 +161,8 @@ export default function Navbar({ username, isAdmin }: { username: string; isAdmi
               Sair
             </button>
           </div>
-        </div>
+        </>
       )}
-    </>
+    </div>
   )
 }

@@ -173,7 +173,13 @@ export default function PredictionForm({ race, drivers, existing, userId }: Prop
   }
 
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-5 pb-24 sm:pb-0">
+    <form
+      onSubmit={handleSubmit}
+      className="flex flex-col gap-5"
+      // A barra de envio e fixed em qualquer largura, entao o espaco embaixo
+      // vale pra todas — mais o home indicator do iPhone
+      style={{ paddingBottom: 'calc(6.5rem + env(safe-area-inset-bottom))' }}
+    >
       {existing && (
         <div className="text-xs font-bold uppercase tracking-widest px-3 py-2 rounded flex items-center gap-2"
           style={{ background: 'rgba(255,192,0,0.08)', border: '1px solid rgba(255,192,0,0.2)', color: 'var(--f1-gold)' }}>

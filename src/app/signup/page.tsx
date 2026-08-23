@@ -73,8 +73,12 @@ export default function SignupPage() {
   if (emailSent) {
     return (
       <div
-        className="min-h-screen flex items-center justify-center px-4"
-        style={{ background: 'radial-gradient(ellipse at top, #1e0a0a 0%, #15151e 50%, #0d0d14 100%)' }}
+        className="min-h-dvh flex items-center justify-center px-4"
+        style={{
+          background: 'radial-gradient(ellipse at top, #1e0a0a 0%, #15151e 50%, #0d0d14 100%)',
+          paddingTop: 'max(1rem, env(safe-area-inset-top))',
+          paddingBottom: 'max(1rem, env(safe-area-inset-bottom))',
+        }}
       >
         <div className="w-full max-w-sm text-center">
           <div className="card" style={{ borderRadius: '2px' }}>
@@ -105,9 +109,11 @@ export default function SignupPage() {
 
   return (
     <div
-      className="min-h-screen flex items-center justify-center px-4"
+      className="min-h-dvh flex items-center justify-center px-4"
       style={{
         background: 'radial-gradient(ellipse at top, #1e0a0a 0%, #15151e 50%, #0d0d14 100%)',
+        paddingTop: 'max(1rem, env(safe-area-inset-top))',
+        paddingBottom: 'max(1rem, env(safe-area-inset-bottom))',
       }}
     >
       <div

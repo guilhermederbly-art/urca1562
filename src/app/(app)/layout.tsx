@@ -19,7 +19,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const isAdmin = user.email === ADMIN_EMAIL
 
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="min-h-dvh flex flex-col">
       <Pinger />
       <Navbar username={profile?.username ?? user.email ?? ''} isAdmin={isAdmin} />
       <main className="flex-1 container mx-auto px-4 py-8 max-w-4xl">

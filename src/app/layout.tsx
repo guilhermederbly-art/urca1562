@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Titillium_Web } from "next/font/google";
 import "./globals.css";
 
@@ -22,6 +22,15 @@ export const metadata: Metadata = {
   },
 };
 
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  // Necessario para que env(safe-area-inset-*) devolva valores reais em
+  // iPhones com notch — sem isso o app fica embaixo da barra de status
+  viewportFit: "cover",
+  themeColor: "#e8002d",
+};
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -30,7 +39,6 @@ export default function RootLayout({
   return (
     <html lang="pt-BR" className="h-full">
       <head>
-        <meta name="theme-color" content="#e8002d" />
         <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
       </head>
       <body className={`${titillium.className} min-h-full flex flex-col`}>

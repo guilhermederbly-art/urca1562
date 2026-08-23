@@ -147,7 +147,8 @@ body {
   width: 100%;
   transition: border-color 0.15s;
   font-family: 'Titillium Web', sans-serif;
-  font-size: 0.9375rem;
+  /* 16px e o minimo: abaixo disso o Safari do iOS da zoom ao focar o campo */
+  font-size: 1rem;
 }
 
 .input-field:focus {
