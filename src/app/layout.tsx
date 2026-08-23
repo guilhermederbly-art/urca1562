@@ -13,12 +13,11 @@ export const metadata: Metadata = {
   description: "Faça seus palpites de Fórmula 1 com seus amigos",
   manifest: "/manifest.json",
   appleWebApp: {
+    // Ja emite mobile-web-app-capable; declarar de novo em `other` duplicava
+    // a meta tag no HTML
     capable: true,
     statusBarStyle: "black-translucent",
     title: "F1 Bolão",
-  },
-  other: {
-    "mobile-web-app-capable": "yes",
   },
 };
 
