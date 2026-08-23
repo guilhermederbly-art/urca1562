@@ -354,12 +354,12 @@ function RaceRow({
       </div>
 
       <div className="flex-1 min-w-0 px-4 py-3">
-        <div className="flex items-center gap-2 flex-wrap mb-0.5">
-          <span>{getRaceFlag(race.name, race.circuit)}</span>
-          <div className="font-bold text-white" style={{ fontSize: '0.9375rem' }}>
-            {race.name}
-          </div>
-          <span className="status-pill" style={{ color: status.color, backgroundColor: status.bg }}>
+        <div className="mb-0.5">
+          <span className="font-bold text-white" style={{ fontSize: '0.9375rem' }}>
+            {getRaceFlag(race.name, race.circuit)} {race.name}
+          </span>
+          {' '}
+          <span className="status-pill inline-flex" style={{ color: status.color, backgroundColor: status.bg }}>
             {status.label}
           </span>
         </div>
@@ -402,8 +402,8 @@ function RaceRow({
         )}
 
 
-        {/* Botão ver palpites — apenas quando palpites fechados */}
-        {(race.status === 'closed' || race.status === 'finished') && (
+        {/* Botão ver palpites — apenas quando fechado (não quando finalizado) */}
+        {race.status === 'closed' && (
           <button
             onClick={() => onViewPredictions(race)}
             className="text-xs font-bold px-3 py-1.5 rounded border"
@@ -579,13 +579,6 @@ export default function DashboardRaces({ openRace, liveRace, recentlyFinishedRac
               >
                 🏆 Ver pontuação
               </Link>
-              <button
-                onClick={() => setModalRace(recentlyFinishedRace)}
-                className="text-xs font-bold px-3 py-1.5 rounded border"
-                style={{ borderColor: 'var(--f1-border)', color: 'var(--f1-muted)' }}
-              >
-                👁 Ver palpites
-              </button>
             </div>
           </div>
         </div>

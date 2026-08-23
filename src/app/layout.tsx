@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { Titillium_Web } from "next/font/google";
 import "./globals.css";
-import AudioController from "@/components/AudioController";
 
 const titillium = Titillium_Web({
   subsets: ["latin"],
@@ -36,7 +35,6 @@ export default function RootLayout({
       </head>
       <body className={`${titillium.className} min-h-full flex flex-col`}>
         {children}
-        <AudioController />
       </body>
     </html>
   );

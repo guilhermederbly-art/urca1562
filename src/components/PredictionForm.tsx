@@ -268,13 +268,8 @@ export default function PredictionForm({ race, drivers, existing, userId }: Prop
         <p className="text-sm font-medium px-1" style={{ color: 'var(--f1-red)' }}>{error}</p>
       )}
 
-      {/* Desktop submit (inline) */}
-      <button type="submit" className="btn-primary w-full hidden sm:flex" disabled={loading}>
-        {loading ? 'Salvando...' : existing ? 'Atualizar palpite' : 'Enviar palpite'}
-      </button>
-
-      {/* Mobile submit (sticky bottom) */}
-      <div className="fixed bottom-0 left-0 right-0 p-4 sm:hidden z-30" style={{ background: 'linear-gradient(to top, var(--f1-dark) 70%, transparent)', paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}>
+      {/* Sticky submit button */}
+      <div className="fixed bottom-0 left-0 right-0 p-4 z-30" style={{ background: 'linear-gradient(to top, var(--f1-dark) 70%, transparent)', paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}>
         <button type="submit" className="btn-primary w-full" disabled={loading} style={{ fontSize: '1rem', padding: '0.75rem 1.5rem' }}>
           {loading ? 'Salvando...' : existing ? 'Atualizar palpite' : 'Enviar palpite'}
         </button>
