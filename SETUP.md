@@ -59,6 +59,28 @@ Acesse `https://api.openf1.org/v1/sessions?year=2026` e procure a corrida pelo `
 
 ---
 
+## Automação (importante)
+
+A rotina que fecha os palpites, importa resultados e abre a corrida seguinte é o
+endpoint `GET /api/cron/update`, protegido pela env var `CRON_SECRET`. Ele deve
+ser chamado a cada ~10 minutos.
+
+**Esse agendamento NÃO pode ficar no `vercel.json`.** O projeto está no plano
+Hobby da Vercel, onde cron job só roda **uma vez por dia** — qualquer schedule
+mais frequente faz o *deploy inteiro falhar*, com o erro apontando para
+`vercel.com/docs/cron-jobs/usage-and-pricing`. Por isso o `vercel.json` é `{}`.
+
+O agendamento vive num serviço externo (ex.: cron-job.org) chamando:
+
+```
+https://f1-bolao-eight.vercel.app/api/cron/update?secret=<CRON_SECRET>
+```
+
+Se um dia o projeto subir para o plano Pro, o cron pode voltar para o
+`vercel.json`. Até então, **não readicionar** — quebra o deploy.
+
+---
+
 ## Regras de pontuação
 
 | Acerto | Pontos |
