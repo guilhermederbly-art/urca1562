@@ -11,13 +11,20 @@ import type { Prediction, Race } from '@/lib/types/database'
 // 2. Imports results for races that should be finished
 // 3. Opens the next race as soon as a race is marked finished
 export async function GET(req: NextRequest) {
-  // Protect with a secret token (set CRON_SECRET in env)
+  // Protegida por CRON_SECRET, e FALHA FECHADO de proposito.
+  //
+  // Isto ja nasceu como `if (secret) { ... }`, e o efeito foi que a rota ficou
+  // ABERTA em producao por meses: a variavel nunca foi cadastrada na Vercel, e
+  // sem ela a validacao inteira era pulada — sem erro, sem log, sem sintoma.
+  // Recusar quando o segredo nao esta configurado torna esse esquecimento
+  // visivel (a rotina para e alguem percebe) em vez de silencioso.
   const secret = process.env.CRON_SECRET
-  if (secret) {
-    const auth = req.headers.get('authorization') ?? req.nextUrl.searchParams.get('secret')
-    if (auth !== `Bearer ${secret}` && auth !== secret) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+  if (!secret) {
+    return NextResponse.json({ error: 'CRON_SECRET nao configurado' }, { status: 503 })
+  }
+  const auth = req.headers.get('authorization') ?? req.nextUrl.searchParams.get('secret')
+  if (auth !== `Bearer ${secret}` && auth !== secret) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
   const supabase = await createServiceClient()

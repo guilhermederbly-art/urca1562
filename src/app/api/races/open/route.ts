@@ -1,11 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
+import { recusaSeNaoAdmin } from '@/lib/auth'
 import { pickRandomChallenge } from '@/lib/challengeBank'
 
 // POST /api/races/open
 // Body: { raceId: string }
 // Opens predictions for a race, draws the random position (4–20) and picks a random challenge
 export async function POST(req: NextRequest) {
+  const recusa = await recusaSeNaoAdmin()
+  if (recusa) return recusa
+
   const { raceId } = await req.json()
   if (!raceId) return NextResponse.json({ error: 'raceId required' }, { status: 400 })
 

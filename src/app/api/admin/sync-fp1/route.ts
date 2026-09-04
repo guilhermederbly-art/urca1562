@@ -1,9 +1,13 @@
 import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
+import { recusaSeNaoAdmin } from '@/lib/auth'
 
 // POST /api/admin/sync-fp1
 // Atualiza fp1_start_time para todas as corridas existentes no banco
 export async function POST() {
+  const recusa = await recusaSeNaoAdmin()
+  if (recusa) return recusa
+
   const supabase = await createServiceClient()
 
   const res = await fetch('https://api.openf1.org/v1/sessions?year=2026')

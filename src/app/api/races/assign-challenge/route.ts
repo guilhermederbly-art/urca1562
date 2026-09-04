@@ -1,11 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
+import { recusaSeNaoAdmin } from '@/lib/auth'
 import { pickRandomChallenge } from '@/lib/challengeBank'
 
 // POST /api/races/assign-challenge
 // Body: { raceId: string }
 // Assigns a random challenge to a race that is already open (e.g. opened before this feature existed)
 export async function POST(req: NextRequest) {
+  const recusa = await recusaSeNaoAdmin()
+  if (recusa) return recusa
+
   const { raceId } = await req.json()
   if (!raceId) return NextResponse.json({ error: 'raceId required' }, { status: 400 })
 

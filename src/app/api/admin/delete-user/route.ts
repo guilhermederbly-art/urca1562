@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { createClient } from '@/lib/supabase/server'
-
-const ADMIN_EMAIL = 'guilherme.derbly@gmail.com'
+import { ADMIN_EMAIL } from '@/lib/config'
 
 export async function POST(req: NextRequest) {
   // Only admin can call this

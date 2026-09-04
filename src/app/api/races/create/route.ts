@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
+import { recusaSeNaoAdmin } from '@/lib/auth'
 
 export async function POST(req: NextRequest) {
+  const recusa = await recusaSeNaoAdmin()
+  if (recusa) return recusa
+
   const body = await req.json()
   const supabase = await createServiceClient()
 

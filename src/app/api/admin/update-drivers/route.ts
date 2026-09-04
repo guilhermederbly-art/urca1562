@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
+import { recusaSeNaoAdmin } from '@/lib/auth'
 
 const DRIVERS_2026 = [
   { number: 1,  name: 'Lando Norris',       abbreviation: 'NOR', team: 'McLaren',       is_bortoleto: false },
@@ -27,6 +28,9 @@ const DRIVERS_2026 = [
 ]
 
 export async function POST() {
+  const recusa = await recusaSeNaoAdmin()
+  if (recusa) return recusa
+
   const supabase = await createServiceClient()
 
   // Delete all existing drivers

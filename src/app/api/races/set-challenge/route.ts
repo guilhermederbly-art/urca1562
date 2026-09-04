@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
+import { recusaSeNaoAdmin } from '@/lib/auth'
 import { calculateScore } from '@/lib/scoring'
 import type { Prediction } from '@/lib/types/database'
 
@@ -7,6 +8,9 @@ import type { Prediction } from '@/lib/types/database'
 // Body: { raceId: string, correctAnswer: string }
 // Sets the correct answer for the round challenge and recalculates all scores
 export async function POST(req: NextRequest) {
+  const recusa = await recusaSeNaoAdmin()
+  if (recusa) return recusa
+
   const { raceId, correctAnswer } = await req.json()
   if (!raceId || !correctAnswer) return NextResponse.json({ error: 'raceId and correctAnswer required' }, { status: 400 })
 

@@ -1,8 +1,12 @@
 import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
+import { recusaSeNaoAdmin } from '@/lib/auth'
 
 // One-time setup: delete past races, open next upcoming
 export async function POST() {
+  const recusa = await recusaSeNaoAdmin()
+  if (recusa) return recusa
+
   const supabase = await createServiceClient()
 
   // Delete races that already happened (before today)

@@ -1,17 +1,13 @@
 import { NextResponse } from 'next/server'
-import { createClient, createServiceClient } from '@/lib/supabase/server'
+import { createServiceClient } from '@/lib/supabase/server'
+import { recusaSeNaoAdmin } from '@/lib/auth'
 import type { Race } from '@/lib/types/database'
-
-const ADMIN_EMAIL = 'guilherme.derbly@gmail.com'
 
 // POST /api/admin/sync-sessions
 // Busca session keys do OpenF1 para corridas que não têm
 export async function POST() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user || user.email !== ADMIN_EMAIL) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
+  const recusa = await recusaSeNaoAdmin()
+  if (recusa) return recusa
 
   const serviceSupabase = await createServiceClient()
   const { data: races } = await serviceSupabase

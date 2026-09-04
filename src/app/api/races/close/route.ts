@@ -1,10 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
+import { recusaSeNaoAdmin } from '@/lib/auth'
 
 // POST /api/races/close
 // Body: { raceId: string }
 // Closes predictions for a race
 export async function POST(req: NextRequest) {
+  const recusa = await recusaSeNaoAdmin()
+  if (recusa) return recusa
+
   const { raceId } = await req.json()
   if (!raceId) return NextResponse.json({ error: 'raceId required' }, { status: 400 })
 

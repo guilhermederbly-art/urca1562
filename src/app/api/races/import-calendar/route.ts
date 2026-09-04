@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
+import { recusaSeNaoAdmin } from '@/lib/auth'
 
 const BASE_URL = 'https://api.openf1.org/v1'
 
@@ -18,6 +19,9 @@ interface OpenF1Session {
 // POST /api/races/import-calendar
 // Fetches all 2026 F1 sessions from OpenF1 and upserts races into the DB
 export async function POST() {
+  const recusa = await recusaSeNaoAdmin()
+  if (recusa) return recusa
+
   const supabase = await createServiceClient()
 
   // Fetch all 2026 sessions

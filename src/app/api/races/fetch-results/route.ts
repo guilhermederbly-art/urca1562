@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
+import { recusaSeNaoAdmin } from '@/lib/auth'
 import { getFinalPositions, findSessionKey } from '@/lib/openf1'
 import { calculateScore } from '@/lib/scoring'
 import type { Prediction } from '@/lib/types/database'
@@ -49,6 +50,9 @@ async function getEspnFinalPositions(raceStartTime: string): Promise<{
 // POST /api/races/fetch-results
 // Body: { raceId: string }
 export async function POST(req: NextRequest) {
+  const recusa = await recusaSeNaoAdmin()
+  if (recusa) return recusa
+
   const { raceId } = await req.json()
   if (!raceId) return NextResponse.json({ error: 'raceId required' }, { status: 400 })
 
