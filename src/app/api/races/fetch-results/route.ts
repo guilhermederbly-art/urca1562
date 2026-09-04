@@ -1,51 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { recusaSeNaoAdmin, ehChamadaDeSistema } from '@/lib/auth'
+import { getEspnPositions, achaDriverPorNome } from '@/lib/espn'
 import { getFinalPositions, findSessionKey } from '@/lib/openf1'
 import { calculateScore } from '@/lib/scoring'
 import type { Prediction } from '@/lib/types/database'
-
-const ESPN_URL = 'https://site.api.espn.com/apis/site/v2/sports/racing/f1/scoreboard'
-
-// GET final positions from ESPN (works for both live and completed races)
-async function getEspnFinalPositions(raceStartTime: string): Promise<{
-  racePositions: { driverName: string; position: number }[]
-  poleDriverName: string | null
-}> {
-  try {
-    const res = await fetch(ESPN_URL, { next: { revalidate: 0 } })
-    if (!res.ok) return { racePositions: [], poleDriverName: null }
-    const data = await res.json() as {
-      events: {
-        competitions: {
-          date: string
-          type: { abbreviation: string }
-          status: { type: { completed: boolean } }
-          competitors: { order: number; athlete: { displayName: string } }[]
-        }[]
-      }[]
-    }
-    const raceDate = new Date(raceStartTime)
-    let raceComp = null as typeof data.events[0]['competitions'][0] | null
-    let qualiComp = null as typeof data.events[0]['competitions'][0] | null
-    for (const event of data.events ?? []) {
-      for (const comp of event.competitions ?? []) {
-        const diff = Math.abs(new Date(comp.date).getTime() - raceDate.getTime())
-        if (comp.type.abbreviation === 'Race' && diff < 6 * 60 * 60 * 1000) raceComp = comp
-        if ((comp.type.abbreviation === 'Qual' || comp.type.abbreviation === 'Q') && diff < 3 * 24 * 60 * 60 * 1000) qualiComp = comp
-      }
-      if (raceComp) break
-    }
-    if (!raceComp?.competitors?.length) return { racePositions: [], poleDriverName: null }
-    const racePositions = raceComp.competitors
-      .map(c => ({ driverName: c.athlete.displayName, position: c.order }))
-      .sort((a, b) => a.position - b.position)
-    const poleDriverName = qualiComp?.competitors?.find(c => c.order === 1)?.athlete.displayName ?? null
-    return { racePositions, poleDriverName }
-  } catch {
-    return { racePositions: [], poleDriverName: null }
-  }
-}
 
 // POST /api/races/fetch-results
 // Body: { raceId: string }
@@ -79,16 +38,7 @@ export async function POST(req: NextRequest) {
 
   const byNumber = new Map(drivers.map(d => [d.number, d]))
 
-  // Match ESPN display name → driver in our DB
-  function findDriverByName(displayName: string) {
-    const lower = displayName.toLowerCase()
-    let found = (drivers ?? []).find(d => d.name.toLowerCase() === lower)
-    if (!found) {
-      const lastName = lower.split(' ').pop() ?? ''
-      found = (drivers ?? []).find(d => d.name.toLowerCase().endsWith(lastName))
-    }
-    return found ?? null
-  }
+  const findDriverByName = (n: string) => achaDriverPorNome(drivers ?? [], n)
 
   let poleDriverId: string | null = null
   let p1Id: string | null = null
@@ -147,7 +97,7 @@ export async function POST(req: NextRequest) {
 
   // ── Step 3: ESPN fallback if OpenF1 had no P1 ─────────────────────────────
   if (!p1Id) {
-    const espn = await getEspnFinalPositions(race.race_start_time)
+    const espn = await getEspnPositions(race.race_start_time)
     if (espn.racePositions.length >= 3) {
       const ep1 = espn.racePositions.find(p => p.position === 1)
       const ep2 = espn.racePositions.find(p => p.position === 2)

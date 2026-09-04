@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { getFinalPositions } from '@/lib/openf1'
+import { getEspnPositions, achaDriverPorNome } from '@/lib/espn'
 import { calculateScore } from '@/lib/scoring'
 import { pickRandomChallenge } from '@/lib/challengeBank'
 import type { Prediction, Race } from '@/lib/types/database'
@@ -59,7 +60,6 @@ export async function GET(req: NextRequest) {
     // Only attempt after race_start_time + 2 hours (gives time for race to finish)
     const raceEndEstimate = new Date(new Date(race.race_start_time).getTime() + 2 * 60 * 60 * 1000)
     if (now < raceEndEstimate) continue
-    if (!race.openf1_race_session_key) continue
 
     const finished = await tryImportResults(race, supabase, log)
 
@@ -164,8 +164,35 @@ async function tryImportResults(
 
     const byNumber = new Map(drivers.map(d => [d.number, d]))
 
-    // Fetch race positions
-    const racePositions = await getFinalPositions(race.openf1_race_session_key!)
+    // Posicoes por NUMERO (OpenF1) ou por NOME (ESPN) — daqui para baixo o
+    // resto do fluxo so precisa de position + o id do piloto.
+    let racePositions: { position: number; driverId: string | null }[] = []
+    let fonte = 'OpenF1'
+
+    if (race.openf1_race_session_key) {
+      try {
+        const openf1 = await getFinalPositions(race.openf1_race_session_key)
+        racePositions = openf1.map(p => ({ position: p.position, driverId: byNumber.get(p.driver_number)?.id ?? null }))
+      } catch (err) {
+        log.push(`OpenF1 indisponivel para ${race.name}: ${err}`)
+      }
+    }
+
+    // A OpenF1 responde 401 enquanto ha sessao ao vivo para quem nao tem chave
+    // paga — justamente a janela do fim da corrida. Sem esta alternativa, a
+    // rodada terminava sem resultado e so dizia "not ready yet".
+    if (racePositions.length < 10) {
+      const espn = await getEspnPositions(race.race_start_time)
+      // Só grava como FINAL o que a ESPN considera encerrado: no meio da
+      // corrida as posicoes existem e nao sao resultado nenhum.
+      if (espn.isCompleted && espn.racePositions.length >= 10) {
+        racePositions = espn.racePositions.map(p => ({
+          position: p.position,
+          driverId: achaDriverPorNome(drivers, p.driverName)?.id ?? null,
+        }))
+        fonte = 'ESPN'
+      }
+    }
 
     // Need at least 10 classified finishers to consider the race done
     if (racePositions.length < 10) {
@@ -182,11 +209,13 @@ async function tryImportResults(
       return false
     }
 
-    const p1Id = byNumber.get(p1.driver_number)?.id ?? null
-    const p2Id = byNumber.get(p2.driver_number)?.id ?? null
-    const p3Id = byNumber.get(p3.driver_number)?.id ?? null
+    const p1Id = p1.driverId
+    const p2Id = p2.driverId
+    const p3Id = p3.driverId
 
-    // Fetch qualifying for pole
+    // Pole: OpenF1 pela sessao de classificacao e, na falta dela, o nome que a
+    // ESPN da para o 1o da Qual. Pole ausente nao impede gravar o resultado —
+    // ela vale 2 pontos, o resto da corrida vale muito mais.
     let poleDriverId: string | null = null
     if (race.openf1_quali_session_key) {
       try {
@@ -195,20 +224,22 @@ async function tryImportResults(
         if (pole) poleDriverId = byNumber.get(pole.driver_number)?.id ?? null
       } catch {}
     }
+    if (!poleDriverId) {
+      const espn = await getEspnPositions(race.race_start_time)
+      if (espn.poleDriverName) poleDriverId = achaDriverPorNome(drivers, espn.poleDriverName)?.id ?? null
+    }
 
     // Random position driver
     let randomPosDriverId: string | null = null
     if (race.random_position) {
-      const randomDriver = racePositions.find(p => p.position === race.random_position)
-      if (randomDriver) randomPosDriverId = byNumber.get(randomDriver.driver_number)?.id ?? null
+      randomPosDriverId = racePositions.find(p => p.position === race.random_position)?.driverId ?? null
     }
 
     // Bortoleto position
     const bortoleto = drivers.find(d => d.is_bortoleto)
     let bortoletoPosition: number | null = null
     if (bortoleto) {
-      const bortoletoResult = racePositions.find(p => p.driver_number === bortoleto.number)
-      bortoletoPosition = bortoletoResult?.position ?? null
+      bortoletoPosition = racePositions.find(p => p.driverId === bortoleto.id)?.position ?? null
     }
 
     // Upsert result
@@ -243,7 +274,7 @@ async function tryImportResults(
 
     // Mark race as finished
     await supabase.from('races').update({ status: 'finished' }).eq('id', race.id)
-    log.push(`Results imported and scores calculated for: ${race.name}`)
+    log.push(`Results imported and scores calculated for: ${race.name} (fonte: ${fonte})`)
     return true
   } catch (err) {
     log.push(`Error importing results for ${race.name}: ${err}`)
