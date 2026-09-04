@@ -13,8 +13,7 @@ import {
   DicaBar,
   EmptyResultsNotice,
 } from '@/components/RaceResultsView'
-import RaceConsensus from '@/components/RaceConsensus'
-import AllPredictions, { type NamedPrediction } from '@/components/AllPredictions'
+import RaceConsensus, { type RawPrediction } from '@/components/RaceConsensus'
 import RaceScoreboard from '@/components/RaceScoreboard'
 import type { GroupInfo } from '@/components/GroupSelector'
 
@@ -78,26 +77,19 @@ export default async function RacePage({ params }: { params: Promise<{ id: strin
     }))
   }
 
-  // Palpites de todos, disponiveis so depois do fechamento.
-  //
-  // O join com profiles e o que permite a lista ser NOMINAL: sem ele da para
-  // dizer "60% escolheu VER" (o consenso), mas nao quem escolheu o que.
-  let allPredictions: NamedPrediction[] = []
+  // Raw predictions for consensus (available after close)
+  let allPredictions: RawPrediction[] = []
   if (!isOpen) {
-    const { data: allPreds } = await supabase
-      .from('predictions')
-      .select('*, profiles(username)')
-      .eq('race_id', id)
-    allPredictions = (allPreds ?? []).map((p: Record<string, unknown>) => ({
-      userId: p.user_id as string,
-      username: (p.profiles as { username: string } | null)?.username ?? 'sem nome',
-      pole_driver_id: p.pole_driver_id as string | null,
-      p1_driver_id: p.p1_driver_id as string | null,
-      p2_driver_id: p.p2_driver_id as string | null,
-      p3_driver_id: p.p3_driver_id as string | null,
-      random_pos_driver_id: p.random_pos_driver_id as string | null,
-      bortoleto_position: p.bortoleto_position as number | null,
-      challenge_answer: p.challenge_answer as string | null,
+    const { data: allPreds } = await supabase.from('predictions').select('*').eq('race_id', id)
+    allPredictions = (allPreds ?? []).map(p => ({
+      userId: p.user_id,
+      pole_driver_id: p.pole_driver_id,
+      p1_driver_id: p.p1_driver_id,
+      p2_driver_id: p.p2_driver_id,
+      p3_driver_id: p.p3_driver_id,
+      random_pos_driver_id: p.random_pos_driver_id,
+      bortoleto_position: p.bortoleto_position,
+      challenge_answer: p.challenge_answer,
     }))
   }
 
@@ -149,16 +141,6 @@ export default async function RacePage({ params }: { params: Promise<{ id: strin
                   scores={scores}
                   currentUserId={user!.id}
                   hasChallengePoints={scores.some(s => s.challenge_points > 0)}
-                  groups={groups}
-                />
-              )}
-              {allPredictions.length > 0 && (
-                <AllPredictions
-                  race={race}
-                  allPredictions={allPredictions}
-                  drivers={drivers ?? []}
-                  result={result ?? undefined}
-                  currentUserId={user!.id}
                   groups={groups}
                 />
               )}
