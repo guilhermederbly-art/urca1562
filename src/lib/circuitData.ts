@@ -171,9 +171,10 @@ const keywords: Record<string, string> = {
   hungaroring: 'hungaroring', hungary: 'hungaroring', hungria: 'hungaroring', budapest: 'hungaroring',
   zandvoort: 'zandvoort', netherlands: 'zandvoort', holanda: 'zandvoort',
   monza: 'monza', italy: 'monza', itália: 'monza',
-  madrid: 'madrid',
+  madrid: 'madrid', madring: 'madrid',
+  espanha: 'barcelona', spain: 'barcelona', catalunya: 'barcelona',
   baku: 'baku', azerbaijan: 'baku', azerbaijão: 'baku',
-  singapore: 'singapore', singapura: 'singapore', marina: 'singapore',
+  singapore: 'singapore', singapura: 'singapore',
   austin: 'cota', americas: 'cota', cota: 'cota', texas: 'cota',
   mexico: 'mexico', méxico: 'mexico', hermanos: 'mexico',
   interlagos: 'interlagos', brazil: 'interlagos', brasil: 'interlagos', paulo: 'interlagos',
@@ -193,21 +194,35 @@ const circuitFlags: Record<string, string> = {
   las_vegas: '🇺🇸', losail: '🇶🇦', yas_marina: '🇦🇪',
 }
 
-export function getRaceFlag(raceName: string, circuit?: string): string {
-  const search = `${raceName} ${circuit ?? ''}`.toLowerCase()
-  for (const [kw, key] of Object.entries(keywords)) {
-    if (search.includes(kw)) return circuitFlags[key] ?? '🏁'
-  }
-  return '🏁'
-}
-
-export function getCircuitInfo(raceName: string, circuit?: string): (CircuitInfo & { _key: string }) | null {
-  const search = `${raceName} ${circuit ?? ''}`.toLowerCase()
-  for (const [kw, key] of Object.entries(keywords)) {
-    if (search.includes(kw)) {
-      const info = circuits[key]
-      return info ? { ...info, _key: key } : null
+// Casa por PALAVRA, nunca por substring — era o substring que fazia o GP da
+// Espanha sair com a bandeira da Belgica ('espanha' contem 'spa') e Abu Dhabi
+// com a de Singapura ('Yas Marina' contem 'marina'). Erro de bandeira nao
+// quebra nada, e por isso ficava anos sem ninguem consertar.
+//
+// E o CIRCUITO tem precedencia sobre o nome da corrida, porque ele e mais
+// especifico: duas etapas se chamam 'Grande Premio da Espanha' e so o
+// circuito (Catalunya x Madring) diz qual e qual.
+function keyDe(raceName: string, circuit?: string): string | null {
+  for (const campo of [circuit, raceName]) {
+    if (!campo) continue
+    const palavras = campo.toLowerCase().split(/[^0-9a-z\u00c0-\u024f]+/).filter(Boolean)
+    for (const p of palavras) {
+      for (const [kw, key] of Object.entries(keywords)) {
+        if (p === kw || p.startsWith(kw)) return key
+      }
     }
   }
   return null
+}
+
+export function getRaceFlag(raceName: string, circuit?: string): string {
+  const key = keyDe(raceName, circuit)
+  return (key && circuitFlags[key]) || '🏁'
+}
+
+export function getCircuitInfo(raceName: string, circuit?: string): (CircuitInfo & { _key: string }) | null {
+  const key = keyDe(raceName, circuit)
+  if (!key) return null
+  const info = circuits[key]
+  return info ? { ...info, _key: key } : null
 }
