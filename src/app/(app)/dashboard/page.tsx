@@ -42,7 +42,7 @@ export default async function DashboardPage() {
     r.status !== 'open' && !isPast(r) && r.id !== liveRace?.id
   )
 
-  const finished = races.filter(r => r.status === 'finished').length
+  const finished = races.filter(r => isPast(r)).length
   const total = races.length
   const pct = total > 0 ? Math.round((finished / total) * 100) : 0
 
