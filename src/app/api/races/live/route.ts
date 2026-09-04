@@ -130,7 +130,11 @@ export async function GET(req: NextRequest) {
           const origin = req.nextUrl.origin
           fetch(`${origin}/api/races/fetch-results`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+              'Content-Type': 'application/json',
+              // Chamada de sistema: aqui nao ha sessao de usuario para enviar.
+              'x-cron-secret': process.env.CRON_SECRET ?? '',
+            },
             body: JSON.stringify({ raceId: race.id }),
           }).catch(() => {})
         }
