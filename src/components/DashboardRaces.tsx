@@ -379,22 +379,22 @@ function RaceRow({
 
         <div className="flex items-center gap-2 flex-shrink-0 pr-4">
           {race.status === 'closed' && !isPast && (
-            <>
-              <Link
-                href={`/ao-vivo/${race.id}`}
-                className="hidden sm:inline-flex text-xs font-black uppercase tracking-widest px-3 py-2 rounded"
-                style={{ border: '1px solid rgba(232,0,45,0.5)', color: 'var(--f1-red)' }}
-              >
-                🔴 Ao vivo
-              </Link>
-              <button
-                onClick={() => onViewPredictions(race)}
-                className="hidden sm:inline-flex text-xs font-black uppercase tracking-widest px-3 py-2 rounded"
-                style={{ border: '1px solid var(--f1-border-light)', color: 'var(--f1-muted)' }}
-              >
-                👁 Palpites
-              </button>
-            </>
+            <Link
+              href={`/ao-vivo/${race.id}`}
+              className="hidden sm:inline-flex text-xs font-black uppercase tracking-widest px-3 py-2 rounded"
+              style={{ border: '1px solid rgba(232,0,45,0.5)', color: 'var(--f1-red)' }}
+            >
+              🔴 Ao vivo
+            </Link>
+          )}
+          {(race.status === 'closed' || race.status === 'finished' || isPast) && (
+            <button
+              onClick={() => onViewPredictions(race)}
+              className="inline-flex text-xs font-black uppercase tracking-widest px-3 py-2 rounded"
+              style={{ border: '1px solid var(--f1-border-light)', color: 'var(--f1-muted)' }}
+            >
+              👁 Palpites
+            </button>
           )}
           {(race.status === 'finished' || isPast) && (
             <Link
