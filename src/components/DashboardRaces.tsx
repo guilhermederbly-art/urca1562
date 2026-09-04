@@ -361,7 +361,8 @@ function RaceRow({
           <span className="round-badge" style={{ fontSize: '1.5rem' }}>{race.round_number}</span>
         </div>
 
-        <div className="flex-1 min-w-0 px-4 py-3.5">
+        <div className="flex-1 min-w-0 px-4 py-3.5 flex flex-col gap-2.5 sm:flex-row sm:items-center sm:gap-3">
+        <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap mb-1">
             <span className="font-bold text-white" style={{ fontSize: '0.9375rem' }}>
               {getRaceFlag(race.name, race.circuit)} {race.name}
@@ -377,7 +378,7 @@ function RaceRow({
           </div>
         </div>
 
-        <div className="flex items-center gap-2 flex-shrink-0 pr-4">
+        <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap sm:flex-shrink-0">
           {race.status === 'closed' && !isPast && (
             <Link
               href={`/ao-vivo/${race.id}`}
@@ -399,7 +400,7 @@ function RaceRow({
           {(race.status === 'finished' || isPast) && (
             <Link
               href={`/races/${race.id}`}
-              className="hidden sm:inline-flex text-xs font-black uppercase tracking-widest px-3 py-2 rounded"
+              className="inline-flex text-xs font-black uppercase tracking-widest px-3 py-2 rounded"
               style={{ border: '1px solid rgba(255,192,0,0.4)', color: 'var(--f1-gold)' }}
             >
               Resultado
@@ -412,6 +413,7 @@ function RaceRow({
           >
             Detalhes
           </button>
+        </div>
         </div>
       </div>
     </div>
